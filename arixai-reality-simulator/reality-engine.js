@@ -1,0 +1,145 @@
+import { createSession, applyTurnResult, appendMessage } from "./reality-state.js";
+
+const API_PATH = "/api/reality";
+
+export class RealityEngine {
+  constructor({ endpoint = API_PATH, timeout = 52000 } = {}) {
+    this.endpoint = endpoint;
+    this.timeout = timeout;
+    this.activeController = null;
+    this.sequence = 0;
+  }
+
+  async health() {
+    const response = await fetch(this.endpoint, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+    const result = await safeJSON(response);
+    if (!response.ok || !result.ok) throw apiError(result, response.status);
+    return result;
+  }
+
+  async prepareScenario(seed, options = {}) {
+    const seedText = options.prompt || `Build a playable simulation based on this curated scenario template. Preserve its situation and intended skills, but add scene details, believable characters, specific objectives and a natural opening line.\n\nTemplate: ${JSON.stringify(seed)}`;
+    const result = await this.request("create", {
+      prompt: seedText,
+      context: options.context || "",
+      mode: options.mode || "training",
+      difficulty: options.difficulty || seed.difficulty || "intermediate",
+      language: options.language || "English"
+    });
+    const scenario = result.scenario;
+    if (!scenario?.characters?.length || !scenario?.openingLine) throw new Error("The scenario was not fully prepared. Please try again.");
+    return scenario;
+  }
+
+  async createCustomScenario(prompt, context = "", options = {}) {
+    const result = await this.request("create", {
+      prompt: String(prompt).trim(), context,
+      mode: options.mode || "training", difficulty: options.difficulty || "adaptive", language: options.language || "English"
+    });
+    return result.scenario;
+  }
+
+  startSession(scenario, options = {}) {
+    let session = createSession(scenario, { ...options, context: options.context || "" });
+    session = appendMessage(session, {
+      role: "character",
+      characterId: scenario.openingCharacterId || scenario.characters?.[0]?.id || "primary",
+      text: scenario.openingLine,
+      emotion: scenario.initialSceneMood || "neutral"
+    });
+    session.scene = { ...session.scene, mood: scenario.initialSceneMood || "calm", stage: "opening", progress: 6 };
+    return session;
+  }
+
+  async sendTurn(session, userInput) {
+    const result = await this.request("turn", {
+      scenario: session.scenario,
+      state: {
+        turnCount: session.turnCount,
+        scene: session.scene,
+        objectives: session.objectives,
+        events: session.events.slice(-12),
+        decisions: session.decisions.slice(-12),
+        summary: session.summary,
+        status: session.status
+      },
+      characters: session.characters,
+      messages: session.messages.slice(-16).map((message) => ({ role: message.role, characterId: message.characterId, text: String(message.text || "").slice(0, 1800), emotion: message.emotion })),
+      userInput,
+      mode: session.mode,
+      difficulty: session.difficulty,
+      pressure: session.pressure,
+      language: session.language,
+      context: session.context,
+      turn: session.turnCount + 1
+    });
+    const allowedCharacters = new Set((session.characters || []).map((character) => character.id));
+    result.responses = (Array.isArray(result.responses) ? result.responses : []).filter((response) => allowedCharacters.has(response.characterId) && String(response.text || "").trim()).slice(0, 3);
+    if (!result.responses.length && result.reply) {
+      result.responses = [{ characterId: session.characters[0]?.id || "primary", text: result.reply, emotion: result.emotion || "neutral" }];
+    }
+    result.characterUpdates = (result.characterUpdates || []).filter((update) => allowedCharacters.has(update.characterId));
+    const allowedObjectives = new Set((session.objectives || []).map((objective) => objective.id));
+    result.objectivesUpdate = (result.objectivesUpdate || []).filter((update) => allowedObjectives.has(update.id));
+    return applyTurnResult(session, result, userInput);
+  }
+
+  async evaluate(session) {
+    const result = await this.request("evaluate", {
+      scenario: session.scenario,
+      state: { objectives: session.objectives, events: session.events, decisions: session.decisions, scene: session.scene, summary: session.summary },
+      messages: session.messages,
+      mode: session.mode,
+      difficulty: session.difficulty,
+      language: session.language,
+      context: session.context
+    });
+    return result;
+  }
+
+  cancel() {
+    this.activeController?.abort();
+    this.activeController = null;
+  }
+
+  async request(action, payload) {
+    this.cancel();
+    const controller = new AbortController();
+    this.activeController = controller;
+    const sequence = ++this.sequence;
+    const timer = window.setTimeout(() => controller.abort(), this.timeout);
+    try {
+      const response = await fetch(this.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
+        body: JSON.stringify({ action, ...payload })
+      });
+      const result = await safeJSON(response);
+      if (sequence !== this.sequence) throw new Error("This request was superseded by a newer action.");
+      if (!response.ok || !result.ok) throw apiError(result, response.status);
+      return result.data;
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("The AI response took too long or the request was cancelled. Your session is saved; try again.");
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+      if (this.activeController === controller) this.activeController = null;
+    }
+  }
+}
+
+async function safeJSON(response) {
+  try { return await response.json(); }
+  catch { return { ok: false, error: { message: `The server returned an unreadable response (${response.status}).` } }; }
+}
+
+function apiError(result, status) {
+  const message = result?.error?.message || `The simulator request failed (${status}).`;
+  const error = new Error(message);
+  error.status = status;
+  error.code = result?.error?.code || "API_ERROR";
+  error.retryAfter = result?.error?.retryAfter || null;
+  return error;
+}

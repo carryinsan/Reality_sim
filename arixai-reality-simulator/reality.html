@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b111b">
+  <meta name="description" content="Step into realistic conversations, decisions and challenges with ArixAI Reality Simulator.">
+  <title>Reality Simulator · ArixAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/reality.css">
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <a class="brand" href="./reality.html" aria-label="ArixAI Reality Simulator home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>arix<span>ai</span></strong><small>REALITY SIMULATOR</small></span>
+      </a>
+      <div class="side-label">WORKSPACE</div>
+      <nav class="side-nav">
+        <button class="side-link is-active" data-nav="discover"><span class="nav-icon">✦</span><span>Discover</span></button>
+        <button class="side-link" data-nav="history"><span class="nav-icon">◷</span><span>My simulations</span><span class="nav-count" id="historyCount">0</span></button>
+        <button class="side-link" data-nav="custom"><span class="nav-icon">＋</span><span>My scenarios</span></button>
+      </nav>
+      <div class="side-divider"></div>
+      <div class="side-label">EXPLORE BY</div>
+      <nav class="side-nav category-nav" id="sidebarCategories">
+        <button class="side-link" data-category="career"><span class="category-dot dot-career"></span><span>Career & work</span></button>
+        <button class="side-link" data-category="everyday"><span class="category-dot dot-everyday"></span><span>Everyday life</span></button>
+        <button class="side-link" data-category="education"><span class="category-dot dot-education"></span><span>Education</span></button>
+        <button class="side-link" data-category="business"><span class="category-dot dot-business"></span><span>Business</span></button>
+        <button class="side-link" data-category="communication"><span class="category-dot dot-communication"></span><span>Communication</span></button>
+        <button class="side-link" data-category="challenge"><span class="category-dot dot-challenge"></span><span>Pressure tests</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="privacy-card"><span class="privacy-icon">◈</span><div><strong>Your space, your pace</strong><p>Sessions are saved on this device unless connected to an account service.</p></div></div>
+        <div class="side-footer"><span class="status-pulse"></span><span id="connectionLabel">Checking simulator…</span></div>
+        <a class="back-link" href="/app.html">← Back to ArixAI</a>
+      </div>
+    </aside>
+
+    <main class="main-content" id="mainContent">
+      <header class="topbar">
+        <div class="breadcrumb"><span>ArixAI</span><span class="crumb-slash">/</span><strong>Reality Simulator</strong></div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="helpButton" aria-label="About Reality Simulator" title="About">?</button>
+          <button class="profile-chip" id="profileButton"><span class="profile-avatar">A</span><span>My space</span><span class="chevron">⌄</span></button>
+        </div>
+      </header>
+
+      <section class="discovery-view" id="discoveryView">
+        <section class="hero-section">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-line"></span> THE WORLD IS YOUR PRACTICE GROUND <span class="eyebrow-spark">✦</span></div>
+            <h1>Experience it<br><em>before you face it.</em></h1>
+            <p>Step into real-life situations. Meet characters with their own minds. Make the call, handle the moment, and discover what you can do.</p>
+            <div class="hero-actions">
+              <button class="primary-button" id="exploreButton"><span>Explore experiences</span><span class="button-arrow">↗</span></button>
+              <button class="text-button" id="createScenarioButton"><span class="plus-circle">＋</span> Create your own</button>
+            </div>
+            <div class="hero-proof"><div class="proof-avatars"><span>✦</span><span>◈</span><span>◎</span></div><span><strong>One situation at a time.</strong> Progress at your own pace.</span></div>
+          </div>
+          <div class="hero-art" aria-label="Illustration of a person entering an interactive simulation">
+            <div class="hero-orbit orbit-a"></div><div class="hero-orbit orbit-b"></div>
+            <div class="hero-glow"></div>
+            <div class="hero-window window-back"><span class="window-bar"><i></i><i></i><i></i></span><span class="window-lines"></span></div>
+            <div class="hero-scene-card">
+              <div class="scene-card-top"><span class="live-dot"></span><span>LIVE SCENARIO</span><span class="scene-card-more">•••</span></div>
+              <div class="hero-mini-room">
+                <div class="mini-window"></div><div class="mini-table"></div>
+                <div class="mini-person person-one"><i></i><b></b></div><div class="mini-person person-two"><i></i><b></b></div>
+                <div class="mini-chat"><span></span><span></span><span></span></div>
+              </div>
+              <div class="scene-card-bottom"><div><strong>The first impression</strong><small>Job interview · Intermediate</small></div><span class="mini-play">↗</span></div>
+            </div>
+            <div class="floating-note note-left"><span class="note-icon">✧</span><div><strong>Think on your feet</strong><small>Every response matters</small></div></div>
+            <div class="floating-note note-right"><span class="note-check">✓</span><div><strong>Your next move</strong><small>It's yours to make</small></div></div>
+            <div class="hero-spark spark-one">✦</div><div class="hero-spark spark-two">✧</div>
+          </div>
+          <div class="hero-bottom-line"><span>01 / DISCOVER</span><span class="hero-bottom-rule"></span><span>THE EXPERIENCE STARTS WITH YOU</span></div>
+        </section>
+
+        <section class="discovery-toolbar" id="experienceLibrary">
+          <div><div class="section-kicker">CHOOSE YOUR NEXT MOMENT</div><h2>Where would you like to begin?</h2><p>Pick a scene, or describe a situation that is uniquely yours.</p></div>
+          <div class="toolbar-right"><button class="surprise-button" id="surpriseButton"><span>⤨</span> Surprise me</button><div class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Search situations, skills…" aria-label="Search scenarios"><kbd>/</kbd></div></div>
+        </section>
+
+        <div class="category-pills" id="categoryTabs" role="tablist" aria-label="Scenario categories">
+          <button class="category-pill is-active" data-category="all" role="tab" aria-selected="true">All experiences <span>63</span></button>
+          <button class="category-pill" data-category="career" role="tab" aria-selected="false">Career</button>
+          <button class="category-pill" data-category="everyday" role="tab" aria-selected="false">Everyday life</button>
+          <button class="category-pill" data-category="education" role="tab" aria-selected="false">Education</button>
+          <button class="category-pill" data-category="business" role="tab" aria-selected="false">Business</button>
+          <button class="category-pill" data-category="communication" role="tab" aria-selected="false">Communication</button>
+          <button class="category-pill" data-category="challenge" role="tab" aria-selected="false">Pressure tests</button>
+        </div>
+
+        <section class="featured-row" id="featuredSpotlight" aria-label="Featured experience"></section>
+        <section class="library-section">
+          <div class="library-heading"><div><div class="section-kicker">THE SCENARIO LIBRARY</div><h2 id="libraryTitle">Explore all experiences</h2></div><span class="result-count" id="resultCount">63 experiences</span></div>
+          <div class="scenario-grid" id="scenarioGrid" aria-live="polite"></div>
+          <div class="empty-state hidden" id="emptyState"><span>⌕</span><h3>No matching experiences</h3><p>Try another keyword, or create your own situation.</p><button class="outline-button" id="emptyCreateButton">Create a scenario</button></div>
+        </section>
+
+        <section class="recent-section" id="recentSection">
+          <div class="library-heading"><div><div class="section-kicker">PICK UP WHERE YOU LEFT OFF</div><h2>Your recent simulations</h2></div><button class="link-button" data-nav="history">View history →</button></div>
+          <div class="recent-grid" id="recentList"><div class="recent-empty">Your next experience is waiting. Start one to see it here.</div></div>
+        </section>
+        <footer class="page-footer"><span>ARIXAI REALITY SIMULATOR</span><span>Built for practice, curiosity and better decisions.</span><a href="/app.html">Return to ArixAI ↗</a></footer>
+      </section>
+
+      <section class="history-view hidden" id="historyView">
+        <div class="inner-page-heading"><div class="section-kicker">YOUR JOURNEY</div><h1>Every attempt is <em>progress.</em></h1><p>Pick up an unfinished situation, revisit a completed one or see how your skills have evolved.</p></div>
+        <div class="history-summary" id="historySummary"></div>
+        <div class="library-heading"><div><div class="section-kicker">YOUR ACTIVITY</div><h2>Simulation history</h2></div><button class="text-button" id="clearHistoryButton">Clear local history</button></div>
+        <div class="history-list" id="historyList"></div>
+      </section>
+
+      <section class="custom-view hidden" id="customView">
+        <div class="inner-page-heading"><div class="section-kicker">YOUR OWN WORLD</div><h1>Scenarios made <em>for you.</em></h1><p>Build a situation around a real conversation, a future challenge or something you simply want to explore.</p><button class="primary-button" id="customViewCreateButton">＋ Build a scenario</button></div>
+        <div class="library-heading"><div><div class="section-kicker">SAVED BY YOU</div><h2>Your custom scenarios</h2></div><div class="toolbar-right"><button class="outline-button" id="importScenarioButton">Import scenario ↑</button><input id="importScenarioInput" type="file" accept=".json,application/json" hidden><span class="result-count" id="customCount">0 saved</span></div></div>
+        <div class="scenario-grid custom-grid" id="customScenarioGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <section class="simulation-view hidden" id="simulationView" aria-label="Active simulation">
+    <header class="sim-topbar">
+      <button class="sim-brand" id="leaveSimulationButton" aria-label="Leave simulation"><span class="brand-mark small"><span></span><span></span><span></span></span><strong>ARIXAI <i>/ REALITY</i></strong></button>
+      <div class="sim-breadcrumb"><span id="simCategory">EXPERIENCE</span><b>·</b><strong id="simTitle">Simulation</strong></div>
+      <div class="sim-top-actions"><span class="sim-live-status"><i></i><span id="simStatus">LIVE SESSION</span></span><button class="sim-icon-button" id="voiceOutputButton" title="Toggle spoken character responses" aria-label="Toggle spoken character responses" aria-pressed="false">◖</button><button class="sim-icon-button" id="pauseButton" title="Pause simulation" aria-label="Pause simulation">Ⅱ</button><button class="sim-icon-button" id="fullscreenButton" title="Toggle fullscreen" aria-label="Toggle fullscreen">⛶</button><button class="sim-exit-button" id="finishButton">End experience</button></div>
+    </header>
+    <div class="sim-progress-track"><span id="simProgressBar"></span></div>
+    <div class="sim-layout">
+      <aside class="sim-rail">
+        <div class="rail-heading">IN THIS SCENE <span id="characterCount">01</span></div>
+        <div id="characterPanel" class="character-stack"></div>
+        <div class="rail-divider"></div>
+        <div class="rail-heading">SCENE DETAILS</div>
+        <div class="scene-info-card"><span class="scene-info-icon">◈</span><div><strong id="sceneLabel">Interview room</strong><small id="sceneSubLabel">A focused conversation</small></div></div>
+        <div class="scene-info-card"><span class="scene-info-icon">◎</span><div><strong id="modeLabel">Training mode</strong><small id="difficultyLabel">Intermediate</small></div></div>
+        <div class="rail-objectives"><div class="rail-heading">YOUR OBJECTIVES <span id="objectiveCounter">0/3</span></div><div id="objectiveList"></div></div>
+        <div class="rail-bottom"><span class="privacy-lock">♧</span><span>AI characters · Simulated environment</span></div>
+      </aside>
+      <main class="sim-stage">
+        <div class="scene-wrap" id="sceneWrap"><div id="sceneRoot" class="scene-root"></div><div class="scene-vignette"></div><div class="scene-caption"><span class="caption-mark"></span><span id="sceneCaption">The conversation is about to begin.</span></div><div class="tension-indicator"><span>SCENE ENERGY</span><div><i id="tensionBar"></i></div></div></div>
+        <div class="interaction-area">
+          <div class="conversation-topline"><div class="conversation-label"><span class="conversation-pulse"></span> THE MOMENT <span class="conversation-turn" id="turnCount">TURN 01</span></div><button class="subtle-action" id="replayLastButton" disabled>↶ Replay last line</button></div>
+          <div class="dialogue-list" id="dialogueList" aria-live="polite" aria-relevant="additions"></div>
+          <div class="event-feed" id="eventFeed" aria-live="polite"></div>
+          <div class="suggestion-row" id="suggestionRow"></div>
+          <form class="response-composer" id="responseForm">
+            <label class="sr-only" for="responseInput">Your response</label>
+            <textarea id="responseInput" rows="1" maxlength="5000" placeholder="What do you say or do? Be yourself…" required></textarea>
+            <div class="composer-bottom"><div class="composer-tools"><button type="button" class="composer-tool" id="micButton" title="Speak your response" aria-label="Speak your response">⌁<span>Voice</span></button><span class="composer-divider"></span><button type="button" class="composer-tool" id="hintButton" title="Ask for a hint">✧<span>Hint</span></button><span class="composer-divider"></span><span class="composer-count" id="responseCount">0 / 5000</span></div><button class="send-button" id="sendButton" type="submit"><span>Send response</span><b>↗</b></button></div>
+          </form>
+          <div class="composer-footnote"><span>↳</span> There isn't always one perfect answer. Respond naturally.</div>
+        </div>
+      </main>
+      <aside class="sim-insight-rail">
+        <div class="insight-head"><span>SESSION INSIGHTS</span><button id="insightCollapseButton" aria-label="Collapse insights">−</button></div>
+        <div class="insight-block"><div class="insight-title">What matters here</div><p id="scenarioObjectiveText">Stay present, understand the situation and choose your next move.</p></div>
+        <div class="insight-block"><div class="insight-title">Situation tracker</div><div class="tracker-row"><span>Conversation</span><strong id="conversationStage">Opening</strong></div><div class="tracker-row"><span>Scene energy</span><strong id="sceneEnergy">Calm</strong></div><div class="tracker-meter"><i id="trackerMeterFill"></i></div></div>
+        <div class="insight-block event-log-block"><div class="insight-title">What's unfolding <span class="tiny-counter" id="eventCount">0</span></div><div id="eventLog"><div class="quiet-event">The situation will unfold as you interact.</div></div></div>
+        <div class="insight-block timer-block hidden" id="timerBlock"><div class="insight-title">Time remaining</div><div class="timer-value" id="timerValue">05:00</div></div>
+        <div class="insight-rail-bottom"><button class="rail-control" id="saveExitButton">↙ Save & leave</button><button class="rail-control" id="restartButton">↻ Restart scenario</button></div>
+      </aside>
+    </div>
+    <div class="pause-overlay hidden" id="pauseOverlay"><div class="pause-card"><span class="pause-symbol">Ⅱ</span><div class="section-kicker">TAKE YOUR TIME</div><h2>Paused for a moment.</h2><p>Your scene is saved on this device. Return whenever you're ready.</p><button class="primary-button" id="resumeButton">Resume experience <span>↗</span></button><button class="text-button" id="pauseSaveButton">Save and leave</button></div></div>
+  </section>
+
+  <section class="results-view hidden" id="resultsView">
+    <header class="results-topbar"><button class="sim-brand" id="resultsHomeButton"><span class="brand-mark small"><span></span><span></span><span></span></span><strong>ARIXAI <i>/ REALITY</i></strong></button><span class="results-label">SIMULATION DEBRIEF</span><button class="sim-exit-button" id="resultsCloseButton">Back to discovery</button></header>
+    <main class="results-content" id="resultsContent">
+      <div class="results-loading"><div class="loading-orbit"></div><div class="section-kicker">REFLECTING ON YOUR EXPERIENCE</div><h1>Finding the moments<br><em>that mattered.</em></h1><p>Reviewing your choices, the conversation and what changed.</p></div>
+    </main>
+  </section>
+
+  <dialog class="app-dialog" id="setupDialog">
+    <form method="dialog" class="dialog-form" id="setupForm">
+      <div class="dialog-top"><div><div class="section-kicker">MAKE IT YOURS</div><h2>Set the scene.</h2></div><button class="dialog-close" value="cancel" aria-label="Close">×</button></div>
+      <div class="setup-preview" id="setupPreview"></div>
+      <div class="form-grid">
+        <label class="field-label">Experience mode<select id="setupMode"><option value="training">Training · Hints available</option><option value="free">Free experience · No scoring pressure</option><option value="challenge">Challenge · No assistance</option><option value="expert">Expert · High complexity</option><option value="timed">Timed · Work against the clock</option><option value="examination">Examination · Examiner-led</option><option value="debate">Debate · Defend your position</option><option value="negotiation">Negotiation · Find common ground</option><option value="multi">Multi-character · A room of perspectives</option></select></label>
+        <label class="field-label">Difficulty<select id="setupDifficulty"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option><option value="expert">Expert</option><option value="adaptive">Adaptive</option></select></label>
+        <label class="field-label">Pressure level<select id="setupPressure"><option value="gentle">Gentle</option><option value="balanced" selected>Balanced</option><option value="high">High pressure</option></select></label>
+        <label class="field-label">Language<select id="setupLanguage"><option>English</option><option>Hindi</option><option>Gujarati</option><option>Hinglish</option><option>Spanish</option><option>French</option><option>German</option><option>Japanese</option></select></label>
+        <label class="field-label timed-option hidden" id="timeLimitField">Time limit<select id="setupTimeLimit"><option value="180">3 minutes</option><option value="300" selected>5 minutes</option><option value="600">10 minutes</option></select></label>
+        <label class="field-label upload-field">Add context (optional)<span class="upload-control"><input id="contextFile" type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"><span>＋ Attach TXT, MD, CSV or JSON</span></span><small id="uploadName">Text is extracted locally in your browser.</small></label>
+      </div>
+      <div class="dialog-foot"><span class="dialog-note">AI characters and outcomes are simulated.</span><button type="button" class="primary-button" id="beginSimulationButton">Enter the scene <span>↗</span></button></div>
+    </form>
+  </dialog>
+
+  <dialog class="app-dialog create-dialog" id="createDialog">
+    <form method="dialog" class="dialog-form" id="createForm">
+      <div class="dialog-top"><div><div class="section-kicker">DESIGN YOUR EXPERIENCE</div><h2>What do you want to step into?</h2><p>Describe a situation in your own words. ArixAI will shape the setting, characters, objectives and challenge.</p></div><button class="dialog-close" value="cancel" aria-label="Close">×</button></div>
+      <label class="field-label" for="customPrompt">Describe your situation</label>
+      <textarea id="customPrompt" class="custom-prompt" maxlength="3000" placeholder="Example: I have to negotiate a project deadline with a manager who is already under pressure. Make the conversation realistic, with competing priorities and a few unexpected turns…" required></textarea>
+      <div class="create-meta"><span id="customPromptCount">0 / 3000</span><span>Specific details make the experience more personal.</span></div>
+      <label class="field-label">Optional context document</label>
+      <label class="document-drop" for="customContextFile"><span class="document-icon">↥</span><span><strong>Attach a reference</strong><small>TXT, Markdown, CSV or JSON · processed in this browser</small></span><input id="customContextFile" type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json"></label>
+      <div class="dialog-foot"><span class="dialog-note">Your prompt is sent to the configured Gemini model.</span><button type="button" class="primary-button" id="generateScenarioButton">Build my scenario <span>✦</span></button></div>
+    </form>
+  </dialog>
+
+  <dialog class="app-dialog help-dialog" id="helpDialog">
+    <form method="dialog" class="dialog-form"><div class="dialog-top"><div><div class="section-kicker">A DIFFERENT WAY TO PRACTISE</div><h2>How Reality works.</h2></div><button class="dialog-close" value="cancel" aria-label="Close">×</button></div><div class="help-steps"><div><b>01</b><span><strong>Choose a situation</strong><small>Start with a curated experience or create a situation in your own words.</small></span></div><div><b>02</b><span><strong>Enter the moment</strong><small>Meet AI characters, respond naturally and watch the situation evolve.</small></span></div><div><b>03</b><span><strong>Reflect and improve</strong><small>Review evidence from your conversation and practise the parts you want to strengthen.</small></span></div></div><p class="dialog-note">Reality Simulator is a practice environment. Characters and outcomes are AI-generated simulations, not real people or guaranteed predictions.</p><div class="dialog-foot"><span></span><button class="primary-button" value="close">Got it</button></div></form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+  <div class="global-loading hidden" id="globalLoading"><div class="loading-orbit"></div><strong id="loadingTitle">Preparing your experience</strong><span id="loadingSubtitle">Building the scene and characters…</span></div>
+  <script type="module" src="/reality.js"></script>
+</body>
+</html>
