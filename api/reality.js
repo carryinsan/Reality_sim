@@ -35,7 +35,12 @@ Build a complete, playable simulation from the user's scenario description. Retu
     "openingLine": "the first character's natural opening line",
     "openingCharacterId": "matching character id",
     "initialSceneMood": "calm|tense|positive|uncertain|urgent",
-    "possibleComplications": ["plausible developments that may or may not occur"]
+    "possibleComplications": ["plausible developments that may or may not occur"],
+    "storyArc": [{"beat":"short beat title","purpose":"what this stage tests","trigger":"a plausible trigger","notBeforeTurn":1}],
+    "worldFacts": ["established facts that must remain consistent"],
+    "openThreads": ["unresolved questions or promises that may matter later"],
+    "worldVariables": [{"key":"budget","label":"Available budget","value":"₹50,000","detail":"Only when relevant to the scenario"}],
+    "sceneDesign": {"lighting":"soft daylight","visualFocus":"the interviewer","ambientMotion":"subtle room movement"}
   }
 }
 Make 1-4 characters. For multi-person situations, give each a distinct goal and voice. Include at least 3 objectives and 3 evaluation criteria. Avoid generic or impossible settings. Opening line must invite the user's participation.` ,
@@ -46,11 +51,22 @@ Return JSON:
   "reply":"one natural in-character response, usually 1-5 sentences (fallback summary)",
   "characterId":"existing character id for the primary response",
   "responses":[{"characterId":"existing id","text":"natural spoken response","emotion":"calm|curious|warm|skeptical|frustrated|confident|concerned|surprised|neutral"}],
-  "characterUpdates":[{"characterId":"id","mood":"warm|neutral|skeptical|impatient|strict|curious","rapportDelta":-10,"pressureDelta":5,"remember":["short important fact"],"lastReaction":"short reaction summary"}],
+  "characterUpdates":[{"characterId":"id","mood":"warm|neutral|skeptical|impatient|strict|curious","rapportDelta":-10,"pressureDelta":5,"goalProgress":35,"remember":["short important fact"],"lastReaction":"short reaction summary"}],
   "event":null,
   "objectivesUpdate":[{"id":"objective-0","status":"pending|completed"}],
   "decisionImpact":"one sentence describing a real consequence of the user's choice, or empty string",
   "statePatch":{"mood":"calm|tense|positive|uncertain|urgent","tension":0,"stage":"opening|exploration|challenge|turning-point|resolution","progress":10},
+  "sceneCue":"One short sentence describing what visibly changes right now.",
+  "visualCue":{"lighting":"neutral|warm|cool|dramatic|bright|dim","focus":"the active speaker or important object","ambience":"still|subtle-motion|busy|rain|crowd|presentation","transition":"soft|cut|reveal|shift"},
+  "activeBeat":"the current story beat title",
+  "branch":{"label":"short branch label","description":"how this choice changes the direction"},
+  "worldUpdate":{"variables":[{"key":"budget","label":"Available budget","value":"₹45,000","detail":"brief grounded state change"}]},
+  "relationshipUpdates":[{"from":"character-a","to":"character-b","dynamic":"more guarded","trust":42,"tension":65}],
+  "objectiveEvidence":[{"id":"objective-0","evidence":"observable user response supporting this status"}],
+  "unresolvedThreads":["short unresolved detail"],
+  "decisionOptions":[{"id":"choice-a","label":"Ask for a concrete example","prompt":"Ask them for a specific example.","lens":"Test the claim"}],
+  "turnQuality":{"continuity":"maintained|repaired|uncertain","realism":"grounded|plausible|uncertain","notes":"short director note, no meta AI talk"},
+  "continuitySummary":"A compact running memory of established facts, promises, unresolved threads, key user choices and current stakes. Keep it under 1,500 characters and update it after every turn.",
   "suggestedActions":["optional short response idea", "optional short response idea"],
   "ending":false,
   "endingReason":"only when ending is true"
@@ -59,6 +75,14 @@ Guidelines:
 - Normally respond as one character. In a genuine panel, group or multi-character moment, return 2-3 short responses in responses, each from an existing character with a distinct view. Do not force extra speakers into a simple one-to-one conversation. A short event is optional; use it only when the situation genuinely changes.
 - Keep suggestions as optional ideas, never the only valid answers. In challenge/expert modes return fewer or no suggestions.
 - Progress should be gradual. Do not complete all objectives in the first few turns. Do not end before at least 4 user turns unless the user explicitly exits or scenario is clearly resolved.
+- Use the storyArc as guidance, not a script. Choose a beat only when its trigger is earned. Let user decisions create materially different branches.
+- Provide 2-3 decisionOptions only when there are genuinely distinct, useful approaches. Each prompt should be a natural action the user may take; never imply there is only one correct choice.
+- Update world variables only when a turn changes them. Do not reset facts or invent arbitrary numeric meters.
+- Keep unresolvedThreads alive until addressed, resolved or explicitly abandoned. Do not silently forget promises, constraints or previous answers.
+- Update continuitySummary every turn. Preserve names, commitments, constraints, established facts, unresolved questions, important user choices and cause-and-effect. Do not add guesses about the real user.
+- Use sceneCue and visualCue to make the environment react subtly to the story. Do not invent cinematic changes for routine dialogue.
+- objectiveEvidence must quote or accurately reference what the user actually did. Do not mark an objective complete on intent alone.
+- Keep relationshipUpdates coherent with the characters' established relationship and observed interactions.
 - For multi-character scenes, characters may refer to one another, disagree or react to what another character said, but don't create extra characters absent from the scenario.
 - When the user's answer is vague, ask a specific follow-up rather than filling in their reasoning.
 - Do not claim to measure voice tone, body language, facial expression or confidence from text. Do not infer emotions from text beyond reasonable conversational cues.
@@ -116,13 +140,24 @@ export default async function handler(req, res) {
 
   const model = safeModelName();
   const prompt = buildPrompt(action, body);
-  const maxOutputTokens = readInteger(process.env.REALITY_MAX_OUTPUT_TOKENS, action === "create" ? 1800 : 1450, 500, 4096);
-  const timeoutMs = readInteger(process.env.REALITY_TIMEOUT_MS, 45000, 10000, 60000);
+  const outputDefaults = { create: 2600, turn: 2200, evaluate: 1900 };
+  const maxOutputTokens = readInteger(process.env.REALITY_MAX_OUTPUT_TOKENS, outputDefaults[action] || 2200, 700, 6144);
+  const timeoutMs = readInteger(process.env.REALITY_TIMEOUT_MS, 45000, 10000, 55000);
+  const perKeyTimeoutMs = readInteger(process.env.REALITY_PER_KEY_TIMEOUT_MS, 15000, 3000, 30000);
+  const deadline = Date.now() + timeoutMs;
 
   try {
-    const result = await generateWithFailover({ keys, model, prompt, maxOutputTokens, timeoutMs });
-    const parsed = parseModelJSON(result.text);
-    const output = validateModelOutput(action, parsed);
+    let result = await generateWithFailover({ keys, model, prompt, maxOutputTokens, deadline, perKeyTimeoutMs });
+    let output;
+    try {
+      output = validateModelOutput(action, parseModelJSON(result.text));
+    } catch (firstError) {
+      if (firstError.code !== "MODEL_OUTPUT_INVALID") throw firstError;
+      const repairPrompt = `${prompt}\n\nOUTPUT REPAIR PASS: Your previous response was not valid for the requested JSON contract. Return a corrected complete JSON object only. Do not add markdown. Preserve the scenario facts and do not invent missing transcript evidence. Invalid response excerpt: ${String(result.text || "").slice(0, 4200)}`;
+      if (deadline - Date.now() < 4000) throw firstError;
+      result = await generateWithFailover({ keys, model, prompt: repairPrompt, maxOutputTokens, deadline, perKeyTimeoutMs });
+      output = validateModelOutput(action, parseModelJSON(result.text));
+    }
     return res.status(200).json({ ok: true, action, model, keySlot: result.keyName, data: output, usage: result.usage || null });
   } catch (error) {
     const status = Number(error.statusCode) || 502;
@@ -232,19 +267,21 @@ function safeModelName() {
   return /^[a-zA-Z0-9._-]{2,100}$/.test(model) ? model : "gemini-3.8-flash";
 }
 
-async function generateWithFailover({ keys, model, prompt, maxOutputTokens, timeoutMs }) {
+async function generateWithFailover({ keys, model, prompt, maxOutputTokens, deadline, perKeyTimeoutMs }) {
   const start = nextKeyStart % keys.length;
   nextKeyStart = (nextKeyStart + 1) % Math.max(1, keys.length);
   let lastError = null;
   const attempted = [];
   const now = Date.now();
   for (let offset = 0; offset < keys.length; offset += 1) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 1800) break;
     const key = keys[(start + offset) % keys.length];
     const cooldown = keyCooldowns.get(key.name) || 0;
     if (cooldown > now && keys.some((candidate) => (keyCooldowns.get(candidate.name) || 0) <= now)) continue;
     attempted.push(key.name);
     try {
-      const result = await callGemini({ key: key.value, model, prompt, maxOutputTokens, timeoutMs });
+      const result = await callGemini({ key: key.value, model, prompt, maxOutputTokens, timeoutMs: Math.min(perKeyTimeoutMs, remainingMs - 700) });
       keyCooldowns.delete(key.name);
       return { ...result, keyName: key.name };
     } catch (error) {
@@ -258,17 +295,17 @@ async function generateWithFailover({ keys, model, prompt, maxOutputTokens, time
     if (lastError.statusCode === 429) { lastError.statusCode = 429; lastError.code = "GEMINI_KEYS_RATE_LIMITED"; }
     throw lastError;
   }
-  const unavailable = new Error("Configured Gemini key slots are temporarily cooling down.");
-  unavailable.statusCode = 429; unavailable.code = "GEMINI_KEYS_COOLDOWN";
+  const unavailable = new Error(deadline - Date.now() < 1800 ? "The simulator request time budget was exhausted." : "Configured Gemini key slots are temporarily cooling down.");
+  unavailable.statusCode = deadline - Date.now() < 1800 ? 504 : 429;
+  unavailable.code = deadline - Date.now() < 1800 ? "REALITY_REQUEST_TIMEOUT" : "GEMINI_KEYS_COOLDOWN";
   throw unavailable;
 }
 
 async function callGemini({ key, model, prompt, maxOutputTokens, timeoutMs }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response;
   try {
-    response = await fetch(`${GEMINI_ENDPOINT}${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+    const response = await fetch(`${GEMINI_ENDPOINT}${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
@@ -277,35 +314,35 @@ async function callGemini({ key, model, prompt, maxOutputTokens, timeoutMs }) {
         generationConfig: { responseMimeType: "application/json", maxOutputTokens }
       })
     });
+    const text = await response.text();
+    let data;
+    try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
+    if (!response.ok) {
+      const status = response.status;
+      const providerMessage = String(data?.error?.message || "").slice(0, 240);
+      const error = new Error(`Gemini returned ${status}${providerMessage ? `: ${providerMessage}` : "."}`);
+      error.statusCode = status;
+      error.code = status === 429 ? "GEMINI_RATE_LIMITED" : status === 403 ? "GEMINI_FORBIDDEN" : status === 401 ? "GEMINI_UNAUTHORISED" : "GEMINI_PROVIDER_ERROR";
+      error.safeMessage = status === 429 ? "Gemini quota or rate limit reached for this key." : status === 401 || status === 403 ? "Gemini rejected this key or the key does not have access to the selected model." : status >= 500 ? "Gemini is temporarily unavailable." : "Gemini rejected the request. Check model access and request settings.";
+      throw error;
+    }
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const output = parts.map((part) => part.text || "").join("\n").trim();
+    if (!output) {
+      const finishReason = data?.candidates?.[0]?.finishReason || "unknown";
+      const error = new Error(`Gemini returned no text (finish reason: ${finishReason}).`);
+      error.statusCode = 502; error.code = "EMPTY_MODEL_RESPONSE"; error.safeMessage = "The model returned an empty response. Please retry.";
+      throw error;
+    }
+    return { text: output, usage: data.usageMetadata || null };
   } catch (error) {
+    if (error?.statusCode) throw error;
     const failure = new Error(error.name === "AbortError" ? "Gemini request timed out." : "Gemini network request failed.");
     failure.statusCode = error.name === "AbortError" ? 504 : 502;
     failure.code = error.name === "AbortError" ? "GEMINI_TIMEOUT" : "GEMINI_NETWORK_ERROR";
     failure.safeMessage = failure.message;
     throw failure;
   } finally { clearTimeout(timeout); }
-
-  const text = await response.text();
-  let data;
-  try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
-  if (!response.ok) {
-    const status = response.status;
-    const providerMessage = String(data?.error?.message || "").slice(0, 240);
-    const error = new Error(`Gemini returned ${status}${providerMessage ? `: ${providerMessage}` : "."}`);
-    error.statusCode = status;
-    error.code = status === 429 ? "GEMINI_RATE_LIMITED" : status === 403 ? "GEMINI_FORBIDDEN" : status === 401 ? "GEMINI_UNAUTHORISED" : "GEMINI_PROVIDER_ERROR";
-    error.safeMessage = status === 429 ? "Gemini quota or rate limit reached for this key." : status === 401 || status === 403 ? "Gemini rejected this key or the key does not have access to the selected model." : status >= 500 ? "Gemini is temporarily unavailable." : "Gemini rejected the request. Check model access and request settings.";
-    throw error;
-  }
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const output = parts.map((part) => part.text || "").join("\n").trim();
-  if (!output) {
-    const finishReason = data?.candidates?.[0]?.finishReason || "unknown";
-    const error = new Error(`Gemini returned no text (finish reason: ${finishReason}).`);
-    error.statusCode = 502; error.code = "EMPTY_MODEL_RESPONSE"; error.safeMessage = "The model returned an empty response. Please retry.";
-    throw error;
-  }
-  return { text: output, usage: data.usageMetadata || null };
 }
 
 function parseModelJSON(text) {
@@ -353,7 +390,12 @@ function validateModelOutput(action, data) {
       openingLine: String(scenario.openingLine).slice(0, 1000),
       openingCharacterId: validCharacters.some((character) => character.id === scenario.openingCharacterId) ? scenario.openingCharacterId : validCharacters[0].id,
       initialSceneMood: safeEnum(scenario.initialSceneMood, ["calm", "tense", "positive", "uncertain", "urgent"], "calm"),
-      possibleComplications: stringList(scenario.possibleComplications, 6, 240, [])
+      possibleComplications: stringList(scenario.possibleComplications, 8, 240, []),
+      storyArc: Array.isArray(scenario.storyArc) ? scenario.storyArc.slice(0, 7).map((item, index) => ({ beat: String(item.beat || `Beat ${index + 1}`).slice(0, 90), purpose: String(item.purpose || "Advance the situation naturally.").slice(0, 220), trigger: String(item.trigger || "A relevant user decision or scene development.").slice(0, 220), notBeforeTurn: clamp(item.notBeforeTurn, 1, 40) })) : [],
+      worldFacts: stringList(scenario.worldFacts, 18, 240, []),
+      openThreads: stringList(scenario.openThreads, 8, 180, []),
+      worldVariables: Array.isArray(scenario.worldVariables) ? scenario.worldVariables.slice(0, 8).map((item) => ({ key: safeId(item.key, "fact"), label: String(item.label || item.key || "Fact").slice(0, 48), value: String(item.value || "").slice(0, 100), detail: String(item.detail || "").slice(0, 180) })) : [],
+      sceneDesign: scenario.sceneDesign && typeof scenario.sceneDesign === "object" ? { lighting: String(scenario.sceneDesign.lighting || "balanced").slice(0, 48), visualFocus: String(scenario.sceneDesign.visualFocus || "the conversation").slice(0, 90), ambientMotion: String(scenario.sceneDesign.ambientMotion || "subtle").slice(0, 90) } : {}
     } };
   }
   if (action === "turn") {
@@ -370,21 +412,32 @@ function validateModelOutput(action, data) {
       emotion: responses[0].emotion,
       responses,
       characterUpdates: Array.isArray(data.characterUpdates) ? data.characterUpdates.slice(0, 4).map((update) => ({
-        characterId: safeId(update.characterId, "primary"), mood: safeEnum(update.mood, ["warm", "neutral", "skeptical", "impatient", "strict", "curious"], "neutral"),
-        rapportDelta: clamp(update.rapportDelta, -20, 20), pressureDelta: clamp(update.pressureDelta, -20, 20),
-        remember: stringList(update.remember, 3, 180, []), lastReaction: String(update.lastReaction || "").slice(0, 180)
+        characterId: safeId(update.characterId, "primary"), mood: update.mood === undefined || update.mood === null ? undefined : safeEnum(update.mood, ["warm", "neutral", "skeptical", "impatient", "strict", "curious"], "neutral"),
+        rapportDelta: clamp(update.rapportDelta, -20, 20, 0), pressureDelta: clamp(update.pressureDelta, -20, 20, 0),
+        remember: stringList(update.remember, 3, 180, []), lastReaction: update.lastReaction === undefined || update.lastReaction === null ? undefined : String(update.lastReaction).slice(0, 180), goalProgress: update.goalProgress === undefined || update.goalProgress === null ? null : clamp(update.goalProgress, 0, 100)
       })) : [],
       event: data.event && typeof data.event === "object" && String(data.event.title || "").trim() ? {
         title: String(data.event.title).slice(0, 100), description: String(data.event.description || "").slice(0, 360), severity: safeEnum(data.event.severity, ["info", "warning", "success"], "info")
       } : null,
       objectivesUpdate: Array.isArray(data.objectivesUpdate) ? data.objectivesUpdate.slice(0, 8).map((item) => ({ id: safeId(item.id, ""), status: safeEnum(item.status, ["pending", "completed"], "pending") })) : [],
       decisionImpact: String(data.decisionImpact || "").slice(0, 500),
-      statePatch: data.statePatch && typeof data.statePatch === "object" ? {
-        mood: safeEnum(data.statePatch.mood, ["calm", "tense", "positive", "uncertain", "urgent"], "calm"),
-        tension: clamp(data.statePatch.tension, 0, 100),
-        stage: safeEnum(data.statePatch.stage, ["opening", "exploration", "challenge", "turning-point", "resolution"], "exploration"),
-        progress: clamp(data.statePatch.progress, 0, 100)
-      } : {},
+      statePatch: normaliseStatePatch(data.statePatch),
+      sceneCue: String(data.sceneCue || "").slice(0, 240),
+      visualCue: data.visualCue && typeof data.visualCue === "object" ? {
+        lighting: safeEnum(data.visualCue.lighting, ["neutral", "warm", "cool", "dramatic", "bright", "dim"], "neutral"),
+        focus: String(data.visualCue.focus || "the conversation").slice(0, 48),
+        ambience: safeEnum(data.visualCue.ambience, ["still", "subtle-motion", "busy", "rain", "crowd", "presentation"], "still"),
+        transition: safeEnum(data.visualCue.transition, ["soft", "cut", "reveal", "shift"], "soft")
+      } : null,
+      activeBeat: String(data.activeBeat || "").slice(0, 180),
+      branch: data.branch && typeof data.branch === "object" ? { label: String(data.branch.label || "").slice(0, 90), description: String(data.branch.description || "").slice(0, 240) } : null,
+      worldUpdate: data.worldUpdate && typeof data.worldUpdate === "object" ? { variables: Array.isArray(data.worldUpdate.variables) ? data.worldUpdate.variables.slice(0, 8).map((item) => ({ key: safeId(item.key, "fact"), label: String(item.label || item.key || "Fact").slice(0, 48), value: String(item.value || "").slice(0, 100), detail: String(item.detail || "").slice(0, 180) })) : [] } : null,
+      relationshipUpdates: Array.isArray(data.relationshipUpdates) ? data.relationshipUpdates.slice(0, 6).map((item) => ({ from: safeId(item.from, ""), to: safeId(item.to, ""), dynamic: item.dynamic === undefined || item.dynamic === null ? undefined : String(item.dynamic).slice(0, 120), trust: item.trust === undefined || item.trust === null ? undefined : clamp(item.trust, 0, 100), tension: item.tension === undefined || item.tension === null ? undefined : clamp(item.tension, 0, 100) })) : [],
+      objectiveEvidence: Array.isArray(data.objectiveEvidence) ? data.objectiveEvidence.slice(0, 5).map((item) => ({ id: safeId(item.id, ""), evidence: String(item.evidence || "").slice(0, 320) })) : [],
+      unresolvedThreads: stringList(data.unresolvedThreads, 8, 180, []),
+      decisionOptions: Array.isArray(data.decisionOptions) ? data.decisionOptions.slice(0, 3).map((item, index) => ({ id: safeId(item.id, `choice-${index + 1}`), label: String(item.label || "").slice(0, 72), prompt: String(item.prompt || item.intent || item.label || "").slice(0, 220), lens: String(item.lens || "").slice(0, 90) })) : [],
+      turnQuality: data.turnQuality && typeof data.turnQuality === "object" ? { continuity: safeEnum(data.turnQuality.continuity, ["maintained", "repaired", "uncertain"], "maintained"), realism: safeEnum(data.turnQuality.realism, ["grounded", "plausible", "uncertain"], "plausible"), notes: String(data.turnQuality.notes || "").slice(0, 240) } : {},
+      continuitySummary: String(data.continuitySummary || "").slice(0, 1800),
       suggestedActions: stringList(data.suggestedActions, 3, 100, []),
       ending: data.ending === true,
       endingReason: String(data.endingReason || "").slice(0, 500)
@@ -419,8 +472,19 @@ function normaliseCriteria(criteria) {
 }
 function stringList(value, maxItems, maxLength, fallback) { return Array.isArray(value) ? value.slice(0, maxItems).map((item) => String(item).slice(0, maxLength)).filter(Boolean) : fallback; }
 function safeId(value, fallback) { const id = String(value || fallback).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48); return id || fallback; }
+function normaliseStatePatch(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const output = {};
+  const moods = ["calm", "tense", "positive", "uncertain", "urgent"];
+  const stages = ["opening", "exploration", "challenge", "turning-point", "resolution"];
+  if (moods.includes(String(value.mood || "").toLowerCase())) output.mood = String(value.mood).toLowerCase();
+  if (stages.includes(String(value.stage || "").toLowerCase())) output.stage = String(value.stage).toLowerCase();
+  if (value.tension !== undefined && value.tension !== null && Number.isFinite(Number(value.tension))) output.tension = clamp(value.tension, 0, 100);
+  if (value.progress !== undefined && value.progress !== null && Number.isFinite(Number(value.progress))) output.progress = clamp(value.progress, 0, 100);
+  return output;
+}
 function safeEnum(value, allowed, fallback) { const text = String(value || "").toLowerCase(); return allowed.includes(text) ? text : fallback; }
-function clamp(value, min, max) { const number = Number(value); return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : min; }
+function clamp(value, min, max, fallback = min) { const number = Number(value); return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback; }
 function readInteger(value, fallback, min, max) { const number = Number.parseInt(value, 10); return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback; }
 function modelShapeError(message) { const error = new Error(message); error.statusCode = 502; error.code = "MODEL_OUTPUT_INVALID"; error.safeMessage = message; return error; }
 function sendError(res, status, code, message, extra = {}) { return res.status(status).json({ ok: false, error: { code, message, ...extra } }); }

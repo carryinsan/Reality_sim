@@ -12,6 +12,10 @@ const PALETTES = {
   studio: ["#202735", "#48536b", "#d4ab78"]
 };
 
+function mouthPath(path) {
+  return `<path d="${path}" stroke="#8d554a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+}
+
 function esc(value = "") {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 }
@@ -24,7 +28,12 @@ export function renderEnvironment(sceneRoot, scenario, state = {}) {
   const stage = esc(state?.scene?.stage || "Opening");
   const progress = Math.max(0, Math.min(100, Number(state?.scene?.progress) || 5));
   const tension = Math.max(0, Math.min(100, Number(state?.scene?.tension) || 28));
-  const personCount = Math.max(1, Math.min(4, scenario?.characters?.length || 1));
+  const characters = (Array.isArray(state?.characters) && state.characters.length ? state.characters : scenario?.characters || []).slice(0, 4);
+  const personCount = Math.max(1, Math.min(4, characters.length || 1));
+  const visualCue = state?.scene?.visualCue || {};
+  const lighting = String(visualCue.lighting || scenario?.sceneDesign?.lighting || "balanced").toLowerCase();
+  const ambience = String(visualCue.ambience || scenario?.sceneDesign?.ambientMotion || "still").toLowerCase();
+  const focus = esc(visualCue.focus || scenario?.sceneDesign?.visualFocus || "the conversation").slice(0, 70);
   const environmentProps = {
     classroom: `<g opacity=".82"><rect x="315" y="67" width="275" height="105" rx="5" fill="#173a3a" stroke="#b5cdbb" stroke-opacity=".3"/><path d="M345 99 H545 M345 119 H505 M345 139 H470" stroke="#d8e6cb" stroke-opacity=".54" stroke-width="3" stroke-linecap="round"/><path d="M330 286 H610 V308 H330Z" fill="#9a7658"/><path d="M354 308 V350 M586 308 V350" stroke="#674f43" stroke-width="7"/></g>`,
     shop: `<g opacity=".8"><path d="M730 75 H934 V285 H730Z" fill="#1b2834" stroke="#d9e0e3" stroke-opacity=".22"/><path d="M730 145 H934 M730 215 H934" stroke="#d7b78c" stroke-opacity=".5" stroke-width="4"/><g fill="${accent}" opacity=".72"><rect x="750" y="91" width="24" height="40" rx="3"/><rect x="786" y="104" width="31" height="27" rx="3"/><rect x="832" y="91" width="25" height="40" rx="3"/><rect x="875" y="101" width="35" height="30" rx="3"/><rect x="750" y="160" width="34" height="40" rx="3"/><rect x="802" y="170" width="24" height="30" rx="3"/><rect x="844" y="158" width="28" height="42" rx="3"/><rect x="886" y="170" width="24" height="30" rx="3"/></g></g>`,
@@ -39,20 +48,35 @@ export function renderEnvironment(sceneRoot, scenario, state = {}) {
     studio: `<g opacity=".52"><rect x="728" y="84" width="205" height="118" rx="7" fill="#142234" stroke="#dce5ec" stroke-opacity=".2"/><circle cx="830" cy="142" r="29" fill="${accent}" opacity=".18"/><path d="M795 142 H865 M830 107 V177" stroke="${accent}" stroke-opacity=".35" stroke-width="2"/></g>`
   };
   const sceneProps = environmentProps[environment] || environmentProps.studio;
+  const skinTones = ["#d3a27f", "#bd8668", "#e0b08b", "#9c684f"];
+  const hairTones = ["#20202a", "#49372f", "#303b42", "#674935"];
+  const jacketTones = ["#526f7e", "#6a5b71", "#4d7064", "#78624d"];
   const people = Array.from({ length: personCount }, (_, index) => {
-    const x = 300 + index * 140;
+    const character = characters[index] || {};
+    const seed = [...String(character.name || `character-${index}`)].reduce((sum, letter) => ((sum * 31) + letter.charCodeAt(0)) >>> 0, 17);
+    const skin = skinTones[seed % skinTones.length];
+    const hair = hairTones[(seed >>> 3) % hairTones.length];
+    const jacket = jacketTones[(seed >>> 6) % jacketTones.length];
+    const isSpeaking = state?.messages?.filter((message) => message.role === "character").slice(-1)[0]?.characterId === character.id;
+    const expression = String(character.mood || "neutral").toLowerCase();
+    const mouth = ["skeptical", "impatient", "strict"].includes(expression) ? "M-7 46 Q0 42 7 46" : ["warm", "curious"].includes(expression) ? "M-7 44 Q0 52 7 44" : "M-6 46 Q0 48 6 46";
+    const x = 300 + index * (personCount > 2 ? 125 : 150);
     const y = index % 2 ? 236 : 246;
-    return `<g transform="translate(${x} ${y})">
+    return `<g class="scene-person ${isSpeaking ? "is-speaking" : ""}" transform="translate(${x} ${y})" data-character="${esc(character.id || `character-${index + 1}`)}">
       <ellipse cx="0" cy="104" rx="53" ry="10" fill="#050910" opacity=".24"/>
-      <path d="M-38 96 Q-34 34 0 30 Q34 34 38 96Z" fill="${index === 0 ? accent : "#60758b"}" opacity=".95"/>
-      <path d="M-23 42 Q-24 3 0 3 Q24 3 23 42 Q12 58 0 57 Q-12 58 -23 42" fill="#d3a27f"/>
-      <path d="M-24 28 Q-22 -5 4 -2 Q28 0 22 31 Q13 14 0 15 Q-15 14 -24 28" fill="#20202a"/>
-      <circle cx="-8" cy="31" r="2" fill="#24242a"/><circle cx="8" cy="31" r="2" fill="#24242a"/>
-      <path d="M-6 45 Q0 48 7 44" stroke="#8d554a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M-38 96 Q-34 34 0 30 Q34 34 38 96Z" fill="${jacket}" opacity=".98"/>
+      <path d="M-23 42 Q-24 3 0 3 Q24 3 23 42 Q12 58 0 57 Q-12 58 -23 42" fill="${skin}"/>
+      <path d="M-24 28 Q-22 -5 4 -2 Q28 0 22 31 Q13 14 0 15 Q-15 14 -24 28" fill="${hair}"/>
+      <path d="M-12 31 Q-8 29 -5 31 M5 31 Q8 29 12 31" stroke="#24242a" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+      ${mouthPath(mouth)}
+      ${isSpeaking ? `<path d="M-47 75 Q-61 59 -55 45" fill="none" stroke="${accent}" stroke-width="2" stroke-linecap="round" opacity=".8"/>` : ""}
+      <circle cx="0" cy="-7" r="43" fill="${isSpeaking ? accent : "transparent"}" opacity="${isSpeaking ? ".09" : "0"}"/>
     </g>`;
   }).join("");
+  const ambienceMarkup = ambience === "rain" ? `<g opacity=".22" stroke="#b6d0dc" stroke-width="2"><path d="M400 0 L370 60 M470 0 L440 60 M540 0 L510 60 M610 0 L580 60 M680 0 L650 60 M750 0 L720 60 M820 0 L790 60"/></g>` : ambience === "crowd" ? `<g fill="#d9e4eb" opacity=".18">${Array.from({length:14},(_,i)=>`<circle cx="${70+i*66}" cy="${210+(i%3)*13}" r="${3+(i%3)}"/>`).join("")}</g>` : ambience === "presentation" ? `<g opacity=".17"><path d="M430 0 L540 0 L680 315 H310Z" fill="${accent}"/><circle cx="500" cy="250" r="160" fill="${accent}" opacity=".12"/></g>` : `<g class="scene-ambient-motes" fill="#e7d2b5" opacity=".32"><circle cx="112" cy="48" r="1.6"/><circle cx="565" cy="65" r="1.3"/><circle cx="942" cy="230" r="1.5"/></g>`;
+  const lightingOverlay = lighting.includes("dramatic") || lighting.includes("dim") ? `<rect width="1000" height="430" fill="#07101b" opacity=".20"/>` : lighting.includes("bright") || lighting.includes("daylight") ? `<rect width="1000" height="300" fill="#e6d6ba" opacity=".055"/>` : "";
   sceneRoot.innerHTML = `
-    <svg class="environment-art" viewBox="0 0 1000 430" role="img" aria-label="Illustrated ${title} environment" preserveAspectRatio="xMidYMid slice">
+    <svg class="environment-art" style="--scene-accent:${accent}" viewBox="0 0 1000 430" role="img" aria-label="Illustrated ${title} environment" preserveAspectRatio="xMidYMid slice">
       <defs>
         <linearGradient id="room-${environment}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${base}"/><stop offset="1" stop-color="${mid}"/></linearGradient>
         <linearGradient id="floor-${environment}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#162334"/><stop offset="1" stop-color="#0c1421"/></linearGradient>
@@ -64,6 +88,8 @@ export function renderEnvironment(sceneRoot, scenario, state = {}) {
       <path d="M0 320 L1000 292 L1000 430 L0 430Z" fill="url(#floor-${environment})"/>
       <path d="M0 318 L1000 290" stroke="#ffffff" stroke-opacity=".16" stroke-width="2"/>
       ${sceneProps}
+      ${ambienceMarkup}
+      ${lightingOverlay}
       <g opacity=".55" stroke="#d8e6f0" stroke-opacity=".17" fill="none">
         <path d="M50 52 H330 V245 H50Z"/><path d="M65 66 H315 V232 H65Z"/>
         <path d="M80 80 V220 M150 80 V220 M220 80 V220 M290 80 V220"/>
@@ -71,13 +97,13 @@ export function renderEnvironment(sceneRoot, scenario, state = {}) {
       <g opacity=".7"><rect x="690" y="90" width="225" height="120" rx="9" fill="#111c2b" stroke="#ffffff" stroke-opacity=".16"/><rect x="709" y="109" width="187" height="82" rx="4" fill="#9ec3d0" opacity=".12"/><path d="M728 166 L765 142 L797 157 L839 124 L879 145" stroke="${accent}" stroke-width="3" fill="none" stroke-linecap="round"/></g>
       <g opacity=".68"><path d="M160 302 H840 L810 327 H180Z" fill="#101b2a"/><path d="M188 327 V376 M812 327 V376" stroke="#0c1421" stroke-width="10"/><path d="M230 302 V287 H770 V302" fill="none" stroke="#ffffff" stroke-opacity=".13" stroke-width="2"/></g>
       ${people}
-      <g opacity=".3" fill="#fff"><circle cx="112" cy="48" r="1.6"/><circle cx="565" cy="65" r="1.3"/><circle cx="942" cy="230" r="1.5"/></g>
+      <g transform="translate(26 68)"><rect width="${Math.min(320, Math.max(150, focus.length * 5.7))}" height="23" rx="11.5" fill="#07111e" fill-opacity=".42" stroke="#ffffff" stroke-opacity=".1"/><text x="12" y="15" fill="#c7d5df" font-size="9" font-family="Arial,sans-serif">FOCUS · ${focus.toUpperCase().slice(0, 42)}</text></g>
       <rect x="26" y="25" width="238" height="31" rx="15.5" fill="#07111e" fill-opacity=".55" stroke="#ffffff" stroke-opacity=".15"/>
       <text x="44" y="45" fill="#e8f2fb" font-size="12" font-family="Arial,sans-serif" letter-spacing="1.6">${title.toUpperCase().slice(0, 30)}</text>
       <g transform="translate(760 30)"><rect width="205" height="33" rx="16.5" fill="#07111e" fill-opacity=".58" stroke="#ffffff" stroke-opacity=".15"/><text x="16" y="21" fill="#d9e6f0" font-size="11" font-family="Arial,sans-serif">${stage.toUpperCase().slice(0, 22)}</text></g>
       <g transform="translate(35 390)"><rect width="930" height="4" rx="2" fill="#ffffff" fill-opacity=".15"/><rect width="${930 * progress / 100}" height="4" rx="2" fill="${accent}"/><text x="0" y="-12" fill="#d7e5f0" font-size="10" font-family="Arial,sans-serif">SIMULATION PROGRESS</text><text x="930" y="-12" text-anchor="end" fill="#d7e5f0" font-size="10" font-family="Arial,sans-serif">${Math.round(progress)}%</text></g>
     </svg>
-    <div class="scene-atmosphere" style="--scene-accent:${accent};--scene-tension:${tension / 100}"></div>
+    <div class="scene-atmosphere" style="--scene-accent:${accent};--scene-tension:${tension / 100};--scene-light:${lighting}"></div>
   `;
 }
 
@@ -98,8 +124,11 @@ export function renderAvatar(character, active = false) {
     "M24 35 Q22 8 45 8 Q68 8 67 34 L63 48 Q58 26 44 23 Q31 24 26 47Z",
     "M26 35 Q24 13 43 11 Q65 9 64 31 Q56 20 44 24 Q33 25 26 35"
   ][(hash >>> 9) % 3];
-  return `<div class="avatar-portrait ${active ? "is-active" : ""}" aria-label="${name}, ${role}">
-    <svg viewBox="0 0 90 90" aria-hidden="true"><defs><linearGradient id="av-${hash}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${active ? "#d9b17f" : "#879db2"}"/><stop offset="1" stop-color="#273d52"/></linearGradient></defs><rect width="90" height="90" rx="28" fill="url(#av-${hash})"/><path d="M13 90 Q16 53 45 53 Q74 53 77 90" fill="${jacket}"/><ellipse cx="45" cy="38" rx="19" ry="23" fill="${skin}"/><path d="${hairShape}" fill="${hair}"/><circle cx="38" cy="39" r="2" fill="#20212a"/><circle cx="52" cy="39" r="2" fill="#20212a"/><path d="M39 49 Q45 53 51 49" fill="none" stroke="#8c5149" stroke-width="2" stroke-linecap="round"/></svg>
+  const mood = String(character?.mood || "neutral").toLowerCase();
+  const mouth = ["skeptical", "impatient", "strict"].includes(mood) ? "M39 50 Q45 47 51 50" : ["warm", "curious"].includes(mood) ? "M39 48 Q45 56 51 48" : "M40 50 Q45 52 50 50";
+  const brow = ["skeptical", "impatient", "strict"].includes(mood) ? "M34 34 L41 36 M49 36 L56 34" : "M34 34 L41 34 M49 34 L56 34";
+  return `<div class="avatar-portrait ${active ? "is-active" : ""}" aria-label="${name}, ${role}, ${esc(mood)}">
+    <svg viewBox="0 0 90 90" aria-hidden="true"><defs><linearGradient id="av-${hash}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${active ? "#d9b17f" : "#879db2"}"/><stop offset="1" stop-color="#273d52"/></linearGradient></defs><rect width="90" height="90" rx="28" fill="url(#av-${hash})"/><path d="M13 90 Q16 53 45 53 Q74 53 77 90" fill="${jacket}"/><ellipse cx="45" cy="38" rx="19" ry="23" fill="${skin}"/><path d="${hairShape}" fill="${hair}"/><path d="${brow}" fill="none" stroke="#362e2c" stroke-width="1.7" stroke-linecap="round"/><circle cx="38" cy="40" r="2" fill="#20212a"/><circle cx="52" cy="40" r="2" fill="#20212a"/><path d="${mouth}" fill="none" stroke="#8c5149" stroke-width="2" stroke-linecap="round"/></svg>
     <span class="avatar-initial">${initial}</span>
   </div>`;
 }

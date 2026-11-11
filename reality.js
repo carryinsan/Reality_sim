@@ -2,6 +2,7 @@ import { SCENARIOS, CATEGORIES, searchScenarios, createLocalScenarioDraft } from
 import { RealityEngine } from "./reality-engine.js";
 import { restoreSession } from "./reality-state.js";
 import { applyCharacterUpdates } from "./reality-characters.js";
+import { createReplayBranch } from "./reality-intelligence.js";
 import { saveSession, getSession, listSessions, deleteSession, getHistory, saveCustomScenario, getCustomScenarios, removeCustomScenario, clearLocalData } from "./reality-storage.js";
 import { normaliseEvaluation, formatEvaluationForExport } from "./reality-evaluator.js";
 import { renderEnvironment, renderAvatar, setSceneMood, flashScene } from "./reality-visuals.js";
@@ -143,7 +144,7 @@ function openSetup(scenario, prepared = false) {
 function readContextFile(file, maxChars = 24000) {
   if (!file) return Promise.resolve("");
   const ext = file.name.split(".").pop().toLowerCase();
-  if (![["txt", "md", "csv", "json"].includes(ext)]) return Promise.reject(new Error("This build reads TXT, Markdown, CSV and JSON files. PDF/DOCX extraction needs a document parser integration."));
+  if (!["txt", "md", "csv", "json"].includes(ext)) return Promise.reject(new Error("Choose a TXT, Markdown, CSV or JSON reference file."));
   if (file.size > 150000) return Promise.reject(new Error("Keep reference files below 150 KB for this simulator build."));
   return file.text().then((text) => String(text).slice(0, maxChars));
 }
@@ -205,13 +206,19 @@ function renderSimulation() {
   renderDialogue();
   renderEvents();
   renderSessionInsights();
+  renderDecisionBoard();
+  renderCharacterDynamics();
+  renderWorldState();
+  renderBranchTimeline();
   renderSuggestions([]);
   updateTimerLabel();
 }
 function renderCharacters() {
   const session = state.session;
   if (!session) return;
-  refs.characterPanel.innerHTML = session.characters.map((character) => `<button class="character-item ${character.id === state.activeCharacterId ? "is-active" : ""}" data-character-id="${escapeHTML(character.id)}">${renderAvatar(character, character.id === state.activeCharacterId)}<span class="character-copy"><strong>${escapeHTML(character.name)}</strong><small>${escapeHTML(character.role)}</small></span><i class="character-dot"></i></button>`).join("");
+  if (!session.characters.some((character) => character.id === state.activeCharacterId)) state.activeCharacterId = session.characters[0]?.id || null;
+  refs.characterPanel.innerHTML = session.characters.map((character) => `<button class="character-item ${character.id === state.activeCharacterId ? "is-active" : ""}" data-character-id="${escapeHTML(character.id)}" aria-pressed="${character.id === state.activeCharacterId}">${renderAvatar(character, character.id === state.activeCharacterId)}<span class="character-copy"><strong>${escapeHTML(character.name)}</strong><small>${escapeHTML(character.role)}</small></span><i class="character-dot" data-mood="${escapeHTML(character.mood || "neutral")}"></i></button>`).join("");
+  renderCharacterDynamics();
 }
 function renderObjectives() {
   const session = state.session;
@@ -251,7 +258,46 @@ function renderSessionInsights() {
   $("#sceneEnergy").textContent = scene.tension > 72 ? "High pressure" : scene.tension > 48 ? "Building" : scene.tension < 25 ? "Calm" : "Steady";
   $("#conversationStage").textContent = titleCase(scene.stage || "Opening");
   $("#trackerMeterFill").style.width = `${scene.tension}%`;
-  $("#sceneCaption").textContent = session.scenario.settingDetails || session.scenario.description || "A situation shaped by your choices.";
+  $("#activeBeatLabel").textContent = session.activeBeat || titleCase(scene.stage || "Opening moment");
+  $("#sceneCaption").textContent = scene.caption || session.scenario.sceneDesign?.visualFocus || session.scenario.settingDetails || session.scenario.description || "A situation shaped by your choices.";
+}
+function renderDecisionBoard() {
+  const board = $("#decisionBoard");
+  const target = $("#decisionOptions");
+  if (!board || !target || !state.session) return;
+  const options = (state.session.decisionOptions || []).slice(0, 3);
+  board.classList.toggle("hidden", options.length === 0 || state.session.status !== "active");
+  target.innerHTML = options.map((option, index) => `<button class="decision-option" type="button" data-decision-prompt="${escapeHTML(option.prompt)}"><span class="decision-index">0${index + 1}</span><span class="decision-copy"><strong>${escapeHTML(option.label)}</strong>${option.lens ? `<small>${escapeHTML(option.lens)}</small>` : ""}</span><span class="decision-arrow">↗</span></button>`).join("");
+}
+function renderCharacterDynamics() {
+  const target = $("#characterDynamics");
+  const session = state.session;
+  if (!target || !session) return;
+  const character = session.characters.find((item) => item.id === state.activeCharacterId) || session.characters[0];
+  if (!character) { target.innerHTML = `<div class="quiet-event">No active character.</div>`; return; }
+  const mood = titleCase(character.mood || "neutral");
+  const rapport = Math.max(0, Math.min(100, Number(character.rapport) || 0));
+  const pressure = Math.max(0, Math.min(100, Number(character.pressure) || 0));
+  const relation = session.relationships?.find((item) => item.from === character.id || item.to === character.id);
+  target.innerHTML = `<div class="dynamic-character-head">${renderAvatar(character, true)}<div><strong>${escapeHTML(character.name)}</strong><small>${escapeHTML(mood)} · ${escapeHTML(character.style || character.role || "In the scene")}</small></div></div><div class="dynamic-meter"><div><span>Rapport</span><strong>${rapport}</strong></div><i><b style="width:${rapport}%"></b></i></div><div class="dynamic-meter pressure-meter"><div><span>Character pressure</span><strong>${pressure}</strong></div><i><b style="width:${pressure}%"></b></i></div>${relation?.dynamic ? `<p class="dynamic-note">${escapeHTML(relation.dynamic)}</p>` : `<p class="dynamic-note">${escapeHTML(character.lastReaction || "Their response will evolve as the situation develops.")}</p>`}`;
+}
+function renderWorldState() {
+  const target = $("#worldStatePanel");
+  const session = state.session;
+  if (!target || !session) return;
+  const entries = Object.entries(session.worldState || {}).slice(-5);
+  const facts = (session.worldFacts || []).slice(-2);
+  target.innerHTML = entries.length ? entries.map(([key, item]) => `<div class="world-state-item"><span>${escapeHTML(item.label || titleCase(key))}</span><strong>${escapeHTML(item.value || "—")}</strong>${item.detail ? `<small>${escapeHTML(item.detail)}</small>` : ""}</div>`).join("") : facts.length ? facts.map((fact) => `<div class="world-state-item"><span>Established fact</span><strong>${escapeHTML(fact)}</strong></div>`).join("") : `<div class="quiet-event">Relevant facts and resources appear as the situation develops.</div>`;
+}
+function renderBranchTimeline() {
+  const target = $("#branchTimeline");
+  const session = state.session;
+  if (!target || !session) return;
+  const branches = (session.branchHistory || []).slice(-4).reverse();
+  $("#branchCount").textContent = String((session.branchHistory || []).length);
+  const pathMarkup = branches.length ? branches.map((branch) => `<div class="branch-item"><i></i><div><strong>${escapeHTML(branch.label)}</strong><small>${escapeHTML(branch.description || "The situation shifted based on your decision.")}</small></div></div>`).join("") : `<div class="quiet-event">Your decisions will shape this path.</div>`;
+  const replayPoint = (session.branchPoints || []).slice(-1)[0];
+  target.innerHTML = `${pathMarkup}${replayPoint && session.status === "active" ? `<button class="branch-replay-button" type="button" data-replay-point="${escapeHTML(replayPoint.id)}">↶ Replay from turn ${replayPoint.turn}</button>` : ""}${session.branchOrigin ? `<div class="branch-origin-note">Branch replay · based on turn ${Number(session.branchOrigin.turn) || 1}</div>` : ""}`;
 }
 function renderSuggestions(suggestions = []) {
   refs.suggestions.innerHTML = suggestions.slice(0, 3).map((suggestion) => `<button type="button" class="suggestion-chip" data-suggestion="${escapeHTML(suggestion)}">${escapeHTML(suggestion)}</button>`).join("");
@@ -274,13 +320,14 @@ async function submitResponse(text = refs.response.value) {
   addTyping();
   renderSuggestions([]);
   try {
-    const previousTurn = state.session.turnCount;
-    state.session = await engine.sendTurn(state.session, clean);
+      state.session = await engine.sendTurn(state.session, clean);
     const latest = state.session.messages[state.session.messages.length - 1];
     state.activeCharacterId = latest.characterId || state.activeCharacterId;
     const resultEventCount = state.session.events.length;
     $("#typingIndicator")?.remove();
     renderDialogue(); renderCharacters(); renderObjectives(); renderEvents(); renderSessionInsights();
+    renderEnvironment(refs.sceneRoot, state.session.scenario, state.session);
+    renderDecisionBoard(); renderCharacterDynamics(); renderWorldState(); renderBranchTimeline();
     const lastEvent = state.session.events[resultEventCount - 1];
     if (lastEvent) flashScene(refs.sceneRoot, lastEvent.severity);
     setSceneMood(refs.sceneRoot, state.session.scene.mood);
@@ -571,7 +618,7 @@ function bindEvents() {
   $("#customPrompt").addEventListener("input", updateCustomPromptCount);
   $("#generateScenarioButton").addEventListener("click", createCustomFlow);
   $("#helpButton").addEventListener("click", () => refs.helpDialog.showModal());
-  $("#profileButton").addEventListener("click", () => notify("Personal accounts and cross-device sync must be connected through ArixAI authentication.", "info"));
+  $("#profileButton").addEventListener("click", () => notify("Your simulation profile is kept in this browser for this standalone build.", "info"));
   document.addEventListener("click", (event) => {
     const nav = event.target.closest("[data-nav]");
     if (nav) showDiscoveryView(nav.dataset.nav);
@@ -599,6 +646,30 @@ function bindEvents() {
   $("#hintButton").addEventListener("click", () => { if (state.session?.mode === "challenge" || state.session?.mode === "expert") { notify("Hints are disabled in this mode. Trust your judgement and keep going."); return; } refs.response.value = "Could you give me one subtle hint about what I should consider next?"; updateResponseCount(); refs.response.focus(); });
   $("#replayLastButton").addEventListener("click", () => { if (!state.voice) initVoice(); const characterIndex = Math.max(0, state.session?.characters.findIndex((item) => item.id === state.activeCharacterId) || 0); state.voice.speak(state.lastCharacterLine, { characterIndex }); });
   refs.characterPanel.addEventListener("click", (event) => { const button = event.target.closest("[data-character-id]"); if (!button) return; state.activeCharacterId = button.dataset.characterId; renderCharacters(); });
+  $("#decisionOptions").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-decision-prompt]");
+    if (!button || state.busy || !state.session || state.session.status !== "active") return;
+    refs.response.value = button.dataset.decisionPrompt || "";
+    updateResponseCount();
+    refs.response.focus();
+  });
+  $("#branchTimeline").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-replay-point]");
+    if (!button || !state.session || state.busy) return;
+    if (!window.confirm("Create a separate replay from this moment? Your current session will remain saved.")) return;
+    try {
+      const original = state.session;
+      state.voice?.destroy();
+      state.session = createReplayBranch(original, button.dataset.replayPoint);
+      state.activeCharacterId = state.session.characters[0]?.id || null;
+      state.remainingSeconds = Number(state.session.timeLimit) || 0;
+      await persistSession();
+      showSimulationView();
+      renderSimulation();
+      startTimerIfNeeded();
+      notify("A separate reality branch is ready. Try a different response.", "success", 4800);
+    } catch (error) { notify(error.message || "Could not create that replay branch.", "error"); }
+  });
   $("#pauseButton").addEventListener("click", pauseSimulation);
   $("#resumeButton").addEventListener("click", resumeSimulation);
   $("#pauseSaveButton").addEventListener("click", saveAndLeave);

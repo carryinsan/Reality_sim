@@ -7,7 +7,10 @@ export function initialiseCharacters(characters = []) {
     mood: character.mood || character.attitude || "neutral",
     rapport: Number.isFinite(character.rapport) ? character.rapport : 50,
     pressure: Number.isFinite(character.pressure) ? character.pressure : 30,
-    memory: Array.isArray(character.memory) ? character.memory : [],
+    memory: Array.isArray(character.memory) ? character.memory.slice(-10) : [],
+    dialogueHistory: Array.isArray(character.dialogueHistory) ? character.dialogueHistory.slice(-12) : [],
+    goalProgress: Number.isFinite(character.goalProgress) ? Math.max(0, Math.min(100, character.goalProgress)) : 0,
+    lastSpokeAtTurn: Number.isFinite(character.lastSpokeAtTurn) ? character.lastSpokeAtTurn : 0,
     active: index === 0
   }));
 }
@@ -23,11 +26,12 @@ export function applyCharacterUpdates(characters, updates = []) {
     if (!update) return character;
     const rapport = Number.isFinite(update.rapportDelta) ? Math.max(0, Math.min(100, character.rapport + update.rapportDelta)) : character.rapport;
     const pressure = Number.isFinite(update.pressureDelta) ? Math.max(0, Math.min(100, character.pressure + update.pressureDelta)) : character.pressure;
-    const memory = Array.isArray(update.remember) ? [...character.memory, ...update.remember.map((item) => String(item).slice(0, 180))].slice(-8) : character.memory;
+    const memory = Array.isArray(update.remember) ? [...character.memory, ...update.remember.map((item) => String(item).slice(0, 180))].slice(-10) : character.memory;
+    const goalProgress = Number.isFinite(update.goalProgress) ? Math.max(0, Math.min(100, update.goalProgress)) : character.goalProgress;
     return {
       ...character,
       mood: typeof update.mood === "string" ? update.mood.slice(0, 32) : character.mood,
-      rapport, pressure, memory,
+      rapport, pressure, memory, goalProgress,
       lastReaction: typeof update.lastReaction === "string" ? update.lastReaction.slice(0, 180) : character.lastReaction
     };
   });
@@ -44,7 +48,9 @@ export function buildCharacterContext(characters = []) {
     currentMood: character.mood,
     rapport: character.rapport,
     pressure: character.pressure,
-    rememberedDetails: character.memory.slice(-5),
+    rememberedDetails: character.memory.slice(-6),
+    recentDialogue: (character.dialogueHistory || []).slice(-4),
+    goalProgress: character.goalProgress || 0,
     lastReaction: character.lastReaction || ""
   }));
 }

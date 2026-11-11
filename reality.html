@@ -152,6 +152,10 @@
           <div class="conversation-topline"><div class="conversation-label"><span class="conversation-pulse"></span> THE MOMENT <span class="conversation-turn" id="turnCount">TURN 01</span></div><button class="subtle-action" id="replayLastButton" disabled>↶ Replay last line</button></div>
           <div class="dialogue-list" id="dialogueList" aria-live="polite" aria-relevant="additions"></div>
           <div class="event-feed" id="eventFeed" aria-live="polite"></div>
+          <section class="decision-board hidden" id="decisionBoard" aria-label="Possible approaches">
+            <div class="decision-board-head"><div><span class="section-kicker">YOUR NEXT MOVE</span><strong>Choose an approach, or write your own.</strong></div><span class="decision-board-mark">✦</span></div>
+            <div class="decision-options" id="decisionOptions"></div>
+          </section>
           <div class="suggestion-row" id="suggestionRow"></div>
           <form class="response-composer" id="responseForm">
             <label class="sr-only" for="responseInput">Your response</label>
@@ -164,7 +168,10 @@
       <aside class="sim-insight-rail">
         <div class="insight-head"><span>SESSION INSIGHTS</span><button id="insightCollapseButton" aria-label="Collapse insights">−</button></div>
         <div class="insight-block"><div class="insight-title">What matters here</div><p id="scenarioObjectiveText">Stay present, understand the situation and choose your next move.</p></div>
-        <div class="insight-block"><div class="insight-title">Situation tracker</div><div class="tracker-row"><span>Conversation</span><strong id="conversationStage">Opening</strong></div><div class="tracker-row"><span>Scene energy</span><strong id="sceneEnergy">Calm</strong></div><div class="tracker-meter"><i id="trackerMeterFill"></i></div></div>
+        <div class="insight-block"><div class="insight-title">Situation tracker</div><div class="tracker-row"><span>Story beat</span><strong id="conversationStage">Opening</strong></div><div class="tracker-row"><span>Scene energy</span><strong id="sceneEnergy">Calm</strong></div><div class="tracker-meter"><i id="trackerMeterFill"></i></div><div class="tracker-row tracker-subrow"><span>Active focus</span><strong id="activeBeatLabel">Opening moment</strong></div></div>
+        <div class="insight-block character-dynamics-block"><div class="insight-title">Character dynamics</div><div id="characterDynamics"><div class="quiet-event">Character reactions will evolve with the conversation.</div></div></div>
+        <div class="insight-block world-state-block"><div class="insight-title">World state</div><div id="worldStatePanel"><div class="quiet-event">Relevant facts and resources appear as the situation develops.</div></div></div>
+        <div class="insight-block branch-block"><div class="insight-title">Your path <span class="tiny-counter" id="branchCount">0</span></div><div id="branchTimeline"><div class="quiet-event">Your decisions will shape this path.</div></div></div>
         <div class="insight-block event-log-block"><div class="insight-title">What's unfolding <span class="tiny-counter" id="eventCount">0</span></div><div id="eventLog"><div class="quiet-event">The situation will unfold as you interact.</div></div></div>
         <div class="insight-block timer-block hidden" id="timerBlock"><div class="insight-title">Time remaining</div><div class="timer-value" id="timerValue">05:00</div></div>
         <div class="insight-rail-bottom"><button class="rail-control" id="saveExitButton">↙ Save & leave</button><button class="rail-control" id="restartButton">↻ Restart scenario</button></div>

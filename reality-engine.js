@@ -1,4 +1,5 @@
 import { createSession, applyTurnResult, appendMessage } from "./reality-state.js";
+import { buildDirectorContext, captureBranchPoint } from "./reality-intelligence.js";
 
 const API_PATH = "/api/reality";
 
@@ -52,19 +53,14 @@ export class RealityEngine {
   }
 
   async sendTurn(session, userInput) {
+    const startedAt = Date.now();
+    const branchPoint = captureBranchPoint(session);
+    const directorContext = buildDirectorContext(session);
     const result = await this.request("turn", {
       scenario: session.scenario,
-      state: {
-        turnCount: session.turnCount,
-        scene: session.scene,
-        objectives: session.objectives,
-        events: session.events.slice(-12),
-        decisions: session.decisions.slice(-12),
-        summary: session.summary,
-        status: session.status
-      },
+      state: directorContext,
       characters: session.characters,
-      messages: session.messages.slice(-16).map((message) => ({ role: message.role, characterId: message.characterId, text: String(message.text || "").slice(0, 1800), emotion: message.emotion })),
+      messages: session.messages.slice(-24).map((message) => ({ role: message.role, characterId: message.characterId, text: String(message.text || "").slice(0, 1800), emotion: message.emotion })),
       userInput,
       mode: session.mode,
       difficulty: session.difficulty,
@@ -81,14 +77,24 @@ export class RealityEngine {
     result.characterUpdates = (result.characterUpdates || []).filter((update) => allowedCharacters.has(update.characterId));
     const allowedObjectives = new Set((session.objectives || []).map((objective) => objective.id));
     result.objectivesUpdate = (result.objectivesUpdate || []).filter((update) => allowedObjectives.has(update.id));
-    return applyTurnResult(session, result, userInput);
+    const next = applyTurnResult(session, result, userInput);
+    next.branchPoints = [...(session.branchPoints || []), branchPoint].slice(-5);
+    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const previousMetrics = session.turnMetrics || { totalLatencyMs: 0, successfulTurns: 0 };
+    const successfulTurns = Number(previousMetrics.successfulTurns || 0) + 1;
+    next.turnMetrics = {
+      totalLatencyMs: Math.min(3600000, Number(previousMetrics.totalLatencyMs || 0) + elapsedMs),
+      successfulTurns,
+      averageLatencyMs: Math.round((Number(previousMetrics.totalLatencyMs || 0) + elapsedMs) / successfulTurns)
+    };
+    return next;
   }
 
   async evaluate(session) {
     const result = await this.request("evaluate", {
       scenario: session.scenario,
-      state: { objectives: session.objectives, events: session.events, decisions: session.decisions, scene: session.scene, summary: session.summary },
-      messages: session.messages,
+      state: buildDirectorContext(session),
+      messages: session.messages.slice(-80),
       mode: session.mode,
       difficulty: session.difficulty,
       language: session.language,
@@ -107,7 +113,7 @@ export class RealityEngine {
     const controller = new AbortController();
     this.activeController = controller;
     const sequence = ++this.sequence;
-    const timer = window.setTimeout(() => controller.abort(), this.timeout);
+    const timer = globalThis.setTimeout(() => controller.abort(), this.timeout);
     try {
       const response = await fetch(this.endpoint, {
         method: "POST",
@@ -124,7 +130,7 @@ export class RealityEngine {
       if (error.name === "AbortError") throw new Error("The AI response took too long or the request was cancelled. Your session is saved; try again.");
       throw error;
     } finally {
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       if (this.activeController === controller) this.activeController = null;
     }
   }

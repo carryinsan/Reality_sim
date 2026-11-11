@@ -1,0 +1,36 @@
+{
+  "rewrites": [
+    {
+      "source": "/reality",
+      "destination": "/reality.html"
+    },
+    {
+      "source": "/reality/",
+      "destination": "/reality.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/reality.html",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "microphone=(self), camera=()"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "api/reality.js": {
+      "maxDuration": 60
+    }
+  }
+}
