@@ -73,17 +73,18 @@ export function buildDirectorContext(session) {
 /** Safely normalise the richer scene/world payload returned by the simulation director. */
 export function normaliseWorldUpdate(raw = {}, session = {}) {
   const patch = raw && typeof raw === "object" ? raw : {};
-  const current = session.worldState && typeof session.worldState === "object" ? session.worldState : {};
+  const current = session?.worldState && typeof session.worldState === "object" ? session.worldState : {};
   const next = { ...current };
   const updates = Array.isArray(patch.variables) ? patch.variables.slice(0, 8) : [];
   for (const item of updates) {
-    const key = clean(item?.key, 42).toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const key = clean(item.key, 42).toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
     if (!key) continue;
     next[key] = {
       label: clean(item.label || key.replace(/-/g, " "), 48),
       value: clean(item.value, 100),
       detail: clean(item.detail, 180),
-      updatedAtTurn: Number(session.turnCount || 0) + 1
+      updatedAtTurn: Number(session?.turnCount || 0) + 1
     };
   }
   return Object.fromEntries(Object.entries(next).slice(-MAX_FACTS));
@@ -100,12 +101,19 @@ export function normaliseDecisionOptions(options = []) {
 }
 
 export function appendBranch(session, branch = {}) {
-  const label = clean(branch.label || branch.name, 90);
-  const description = clean(branch.description || branch.reason, 240);
-  if (!label && !description) return session.branchHistory || [];
-  return [...(session.branchHistory || []), {
+  // The API intentionally returns branch: null when the director has no meaningful
+  // branch change to record. A default parameter does not catch explicit null.
+  // Normalise that case (and malformed primitives) before reading label/name.
+  const safeBranch = branch && typeof branch === "object" && !Array.isArray(branch) ? branch : {};
+  const previous = Array.isArray(session?.branchHistory)
+    ? session.branchHistory.filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    : [];
+  const label = clean(safeBranch.label || safeBranch.name, 90);
+  const description = clean(safeBranch.description || safeBranch.reason, 240);
+  if (!label && !description) return previous;
+  return [...previous, {
     id: id(), label: label || "A new direction", description,
-    turn: Number(session.turnCount || 0) + 1,
+    turn: Number(session?.turnCount || 0) + 1,
     createdAt: new Date().toISOString()
   }].slice(-MAX_BRANCHES);
 }

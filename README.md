@@ -1,4 +1,4 @@
-# ArixAI Reality Simulator — 2.1
+# ArixAI Reality Simulator — 2.1.2
 
 A dependency-light, immersive real-life simulation experience for ArixAI. Built with HTML, CSS, vanilla JavaScript ES modules, inline SVG, Canvas 2D and browser-native speech APIs. No React, TypeScript, Unity, external game engine or paid visualisation service is required.
 
@@ -21,7 +21,7 @@ The ZIP is intentionally flat: `reality.html`, `reality.css`, the JavaScript mod
 - `reality-voice.js` — browser speech recognition and speech synthesis with text fallback
 - `reality-storage.js` — IndexedDB persistence with localStorage fallback
 - `api/reality.js` — server-side Gemini orchestration, strict validation, bounded retry/repair and three-key failover
-- `tests/smoke.test.js` — automated behaviour and API contract tests
+- `tests/smoke.test.js` — automated behaviour and API contract tests, including null branch handling
 - `vercel.json` — `/reality` routing and security headers
 - `.env.example` — server environment variable template
 
@@ -38,6 +38,7 @@ The ZIP is intentionally flat: `reality.html`, `reality.css`, the JavaScript mod
 - **Responsive 2D scene direction:** SVG environments react to the current speaker, stage, mood, lighting, focus and ambience. Character portraits reflect their current attitude.
 - **More resilient generation:** bounded output validation and one repair pass for malformed model JSON, plus provider-key failover for transient provider errors.
 - **Partial-update safety:** optional character, relationship and scene fields preserve established values when the model omits them; absent rapport/pressure deltas default to zero rather than unexpectedly swinging character dynamics.
+- **Null-branch safety:** the turn API may legitimately return `branch: null` when no new path should be recorded. The state engine now treats this as an empty branch update instead of attempting to read `null.label`. Null entries in world updates and old branch history are also ignored safely.
 - **Branch replay integrity:** replay checkpoints are captured before each submitted turn and fork into a separate local session, leaving the source run unchanged.
 - **Request lifecycle controls:** client cancellation, bounded server-side provider timeout, no-store responses, request-size limits and bounded output token settings.
 - **Scene feedback:** the active speaker, character mood, ambience, focus and scene lighting can change the SVG environment without introducing a 3D runtime.
@@ -62,7 +63,7 @@ npm test
 vercel dev
 ```
 
-The test suite covers the 63-scenario catalogue, state recovery, multi-character turn handling, director context, world-state sanitisation, independent branch replay, partial-update preservation, evaluation normalisation, API readiness, Gemini key failover, enriched turn-response validation, scenario-generation fallback shape and the custom-context upload label with a mocked provider.
+The test suite covers the 63-scenario catalogue, state recovery, multi-character turn handling, null branch responses, director context, world-state sanitisation, independent branch replay, partial-update preservation, evaluation normalisation, API readiness, Gemini key failover, enriched turn-response validation, scenario-generation fallback shape and the custom-context upload label with a mocked provider.
 
 ## API contract
 

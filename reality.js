@@ -285,7 +285,7 @@ function renderWorldState() {
   const target = $("#worldStatePanel");
   const session = state.session;
   if (!target || !session) return;
-  const entries = Object.entries(session.worldState || {}).slice(-5);
+  const entries = Object.entries(session.worldState || {}).filter(([, item]) => item && typeof item === "object").slice(-5);
   const facts = (session.worldFacts || []).slice(-2);
   target.innerHTML = entries.length ? entries.map(([key, item]) => `<div class="world-state-item"><span>${escapeHTML(item.label || titleCase(key))}</span><strong>${escapeHTML(item.value || "—")}</strong>${item.detail ? `<small>${escapeHTML(item.detail)}</small>` : ""}</div>`).join("") : facts.length ? facts.map((fact) => `<div class="world-state-item"><span>Established fact</span><strong>${escapeHTML(fact)}</strong></div>`).join("") : `<div class="quiet-event">Relevant facts and resources appear as the situation develops.</div>`;
 }
@@ -293,7 +293,7 @@ function renderBranchTimeline() {
   const target = $("#branchTimeline");
   const session = state.session;
   if (!target || !session) return;
-  const branches = (session.branchHistory || []).slice(-4).reverse();
+  const branches = (Array.isArray(session.branchHistory) ? session.branchHistory : []).filter((branch) => branch && typeof branch === "object").slice(-4).reverse();
   $("#branchCount").textContent = String((session.branchHistory || []).length);
   const pathMarkup = branches.length ? branches.map((branch) => `<div class="branch-item"><i></i><div><strong>${escapeHTML(branch.label)}</strong><small>${escapeHTML(branch.description || "The situation shifted based on your decision.")}</small></div></div>`).join("") : `<div class="quiet-event">Your decisions will shape this path.</div>`;
   const replayPoint = (session.branchPoints || []).slice(-1)[0];

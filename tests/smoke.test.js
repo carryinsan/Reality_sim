@@ -49,6 +49,24 @@ test("session state appends multiple characters and restores safely", () => {
 });
 
 
+test("turn state accepts an explicit null branch without crashing", () => {
+  const scenario = {
+    id: "null-branch", title: "Everyday conversation", objectives: ["Respond naturally"],
+    characters: [{ id: "partner", name: "Maya", role: "Conversation partner" }]
+  };
+  const session = createSession(scenario);
+  const next = applyTurnResult(session, {
+    reply: "Maya considers your response and replies naturally.",
+    responses: [{ characterId: "partner", text: "Maya considers your response and replies naturally." }],
+    branch: null,
+    worldUpdate: { variables: [null, { key: "time", label: "Time", value: "Afternoon" }] }
+  }, "I would explain my point calmly.");
+  assert.equal(next.turnCount, 1);
+  assert.equal(next.messages.length, 2);
+  assert.deepEqual(next.branchHistory, []);
+  assert.equal(next.worldState.time.value, "Afternoon");
+});
+
 test("director context preserves continuity facts and per-character memory", () => {
   const session = createSession({ id: "director", title: "Supplier negotiation", objectives: ["Agree terms"], worldFacts: ["Delivery is due Friday"], characters: [{ id: "supplier", name: "Ravi", role: "Supplier" }] });
   session.turnCount = 3;

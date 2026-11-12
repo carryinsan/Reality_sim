@@ -1,6 +1,6 @@
 {
   "name": "arixai-reality-simulator",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "description": "A dependency-light, AI-powered, immersive 2D reality simulation experience for ArixAI.",
