@@ -140,10 +140,10 @@ export default async function handler(req, res) {
 
   const model = safeModelName();
   const prompt = buildPrompt(action, body);
-  const outputDefaults = { create: 2600, turn: 2200, evaluate: 1900 };
+  const outputDefaults = { create: 1900, turn: 1450, evaluate: 1250 };
   const maxOutputTokens = readInteger(process.env.REALITY_MAX_OUTPUT_TOKENS, outputDefaults[action] || 2200, 700, 6144);
-  const timeoutMs = readInteger(process.env.REALITY_TIMEOUT_MS, 45000, 10000, 55000);
-  const perKeyTimeoutMs = readInteger(process.env.REALITY_PER_KEY_TIMEOUT_MS, 15000, 3000, 30000);
+  const timeoutMs = readInteger(process.env.REALITY_TIMEOUT_MS, 41000, 10000, 48000);
+  const perKeyTimeoutMs = readInteger(process.env.REALITY_PER_KEY_TIMEOUT_MS, 12000, 3000, 18000);
   const deadline = Date.now() + timeoutMs;
 
   try {
@@ -162,13 +162,57 @@ export default async function handler(req, res) {
   } catch (error) {
     const status = Number(error.statusCode) || 502;
     const code = error.code || "MODEL_REQUEST_FAILED";
+    // Keep the simulation usable during provider latency, transient outages and exhausted quotas.
+    // This fallback is intentionally transparent and deterministic; it never fabricates a Gemini success.
+    if ([408, 429, 500, 502, 503, 504].includes(status)) {
+      const fallback = buildLocalFallback(action, body);
+      if (fallback) return res.status(200).json({ ok: true, action, model: "local-resilience-fallback", degraded: true, warning: "Gemini was temporarily unavailable. The simulation continued using its built-in fallback director.", data: fallback });
+    }
     const safeMessage = status === 429
-      ? "All configured Gemini key slots are currently rate-limited. Try again after the provider's quota window resets."
+      ? "All configured Gemini key slots are rate-limited. Check your Gemini quota or try again shortly."
       : status === 504
-        ? "Gemini did not respond before the request timeout. Your saved simulation remains available; try again."
-        : error.safeMessage || "The AI service could not complete this simulation step. Please try again.";
+        ? "The Gemini request exceeded the server time budget. Your session is saved; the local fallback could not complete this action."
+        : error.safeMessage || "The AI service could not complete this simulation step. Please check the model and API key settings.";
     return sendError(res, status, code, safeMessage, error.retryAfter ? { retryAfter: error.retryAfter } : undefined);
   }
+}
+
+function buildLocalFallback(action, body) {
+  if (action === "create") {
+    const prompt = String(body.prompt || "A practical real-life situation").trim().slice(0, 500);
+    const title = prompt.split(/[.!?\n]/)[0].slice(0, 72) || "A Real-Life Practice Scenario";
+    return validateModelOutput("create", { scenario: {
+      title, description: `A guided practice scenario based on: ${prompt}. The built-in director will keep the situation coherent while Gemini is unavailable.`,
+      category: "custom", environment: "studio", settingDetails: "A calm, focused practice environment with a clear view of the active character.",
+      stakes: "Practise communicating clearly and making considered decisions.", objectives: ["Understand the situation", "Respond with clarity and relevant detail", "Adapt to new information"],
+      successConditions: ["Address the other character's concern", "Explain reasoning clearly"], difficulty: body.difficulty || "adaptive",
+      characters: [{ id: "director-character", name: "Scenario Partner", role: "Your practice partner", background: "A participant in this fictional practice situation.", personality: "Grounded, attentive and consistent", style: "Direct, natural and concise", attitude: "neutral", goal: "Understand the user's position and move the situation forward", knowledgeBoundaries: "Knows only the scenario details provided." }],
+      evaluationCriteria: [{ name: "Clarity", description: "Explains the response clearly", weight: 34 }, { name: "Relevance", description: "Addresses the actual situation", weight: 33 }, { name: "Adaptability", description: "Responds to new information", weight: 33 }],
+      openingLine: "Let's begin. How would you like to approach this situation?", openingCharacterId: "director-character", initialSceneMood: "calm",
+      possibleComplications: ["The other person asks for clarification", "A new constraint emerges"], storyArc: [], worldFacts: ["This is a fictional practice simulation."], openThreads: [], worldVariables: [], sceneDesign: { lighting: "balanced", visualFocus: "the conversation", ambientMotion: "subtle" }
+    } }).scenario;
+  }
+  if (action === "turn") {
+    const scenario = body.scenario || {};
+    const characters = Array.isArray(scenario.characters) ? scenario.characters : [];
+    const charactersState = Array.isArray(body.characters) ? body.characters : [];
+    const active = charactersState.find((item) => item.id === characters[0]?.id) || characters[0] || { id: "director-character", name: "Scenario Partner", role: "Practice partner" };
+    const userInput = String(body.userInput || "").trim().slice(0, 1000);
+    const reply = userInput
+      ? `I understand your point: “${userInput.slice(0, 220)}${userInput.length > 220 ? "…" : ""}” — can you explain the reasoning behind that and what you would do next?`
+      : "Take a moment and tell me how you would approach this.";
+    return validateModelOutput("turn", { reply, characterId: active.id, responses: [{ characterId: active.id, text: reply, emotion: "curious" }],
+      characterUpdates: [{ characterId: active.id, remember: userInput ? [`User said: ${userInput.slice(0, 160)}`] : [] }],
+      decisionImpact: "Your response has been recorded; the situation remains open for your next decision.",
+      statePatch: { mood: "uncertain", stage: "exploration", progress: Math.min(85, 8 + Number(body.turn || 1) * 7) },
+      sceneCue: "The other participant considers your response and waits for a clearer next step.", visualCue: { lighting: "neutral", focus: active.name || "the conversation", ambience: "subtle-motion", transition: "soft" },
+      continuitySummary: `Local fallback director active. Latest user response: ${userInput.slice(0, 500)}`, suggestedActions: ["Give a concrete example", "Explain the reason behind your choice"], ending: false
+    });
+  }
+  if (action === "evaluate") {
+    return validateModelOutput("evaluate", { overallScore: 0, summary: "Gemini was unavailable, so a reliable evidence-based score cannot be calculated. Your conversation remains saved; retry the evaluation when the AI service is available.", outcome: "Evaluation deferred.", dimensions: [], strengths: [], improvements: ["Retry the evaluation when Gemini is available."], keyMoments: [], alternativeResponses: [], repeatPlan: ["Retry the evaluation after checking the Gemini connection."], confidence: "low" });
+  }
+  return null;
 }
 
 function setCommonHeaders(res) {
@@ -311,7 +355,7 @@ async function callGemini({ key, model, prompt, maxOutputTokens, timeoutMs }) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens }
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens, thinkingConfig: { thinkingLevel: "low" } }
       })
     });
     const text = await response.text();

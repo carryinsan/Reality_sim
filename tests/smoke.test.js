@@ -201,3 +201,27 @@ test("turn API preserves omitted state fields and validates director intelligenc
     });
   }
 });
+
+
+test("temporary Gemini provider outage returns a usable local fallback turn", async () => {
+  const previousKey = process.env.GEMINI_KEY;
+  const previousFetch = globalThis.fetch;
+  process.env.GEMINI_KEY = "test-key-for-fallback";
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "temporary overload" } }), { status: 503, headers: { "Content-Type": "application/json" } });
+  try {
+    const response = mockResponse();
+    await handler({
+      method: "POST",
+      headers: { host: "localhost:3000", origin: "http://localhost:3000", "x-forwarded-for": "198.51.100.44" },
+      body: { action: "turn", scenario: { title: "Practice", characters: [{ id: "c1", name: "Maya", role: "Interviewer" }] }, characters: [{ id: "c1", name: "Maya", role: "Interviewer" }], userInput: "I would explain the project outcome with measurable evidence.", turn: 1 }
+    }, response);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.degraded, true);
+    assert.equal(response.body.model, "local-resilience-fallback");
+    assert.match(response.body.data.reply, /measurable evidence/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.GEMINI_KEY; else process.env.GEMINI_KEY = previousKey;
+  }
+});

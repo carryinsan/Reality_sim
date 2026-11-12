@@ -74,8 +74,8 @@ Optional environment variables:
 - `ALLOWED_ORIGINS` — comma-separated allowed origins; same-origin is allowed by default
 - `REALITY_MAX_BODY_BYTES` — request cap
 - `REALITY_MAX_OUTPUT_TOKENS` — generation output cap
-- `REALITY_TIMEOUT_MS` — total provider/failover/repair time budget for one action
-- `REALITY_PER_KEY_TIMEOUT_MS` — maximum time allowed for one configured Gemini key slot
+- `REALITY_TIMEOUT_MS` — total provider/failover time budget for one action (default 41 seconds)
+- `REALITY_PER_KEY_TIMEOUT_MS` — maximum time allowed for one configured Gemini key slot (default 12 seconds)
 - `REALITY_RATE_LIMIT_PER_MINUTE` — instance-local safety limit
 
 The supplied `vercel.json` sets `api/reality.js` to a 60-second maximum function duration. Merge that entry into the ArixAI project's existing Vercel configuration rather than replacing unrelated settings.
@@ -89,3 +89,8 @@ This is a self-contained feature package: the ArixAI repository's private authen
 API throttling in this package is an instance-local brake, not a globally consistent production quota system. For high-volume public traffic, use ArixAI's existing shared rate limiter. Browser speech recognition and speech synthesis vary by browser and operating system; text interaction remains available when voice APIs are missing.
 
 No build can be truthfully guaranteed error-free across all browsers, model outages, quotas and deployment environments. This package passes its automated local checks, but must still be staged against the actual ArixAI repository and live Gemini credentials before production release.
+
+
+### Timeout resilience update
+
+The server now caps the overall Gemini attempt window at 41 seconds by default, caps each key attempt at 12 seconds, uses low thinking effort for interactive turns, and reduces default output budgets. If Gemini times out, is temporarily unavailable, or all configured keys are rate-limited, the API returns a clearly marked built-in local fallback so an active session can continue. The fallback is intentionally limited: it can keep a turn moving, but it does not pretend to provide Gemini-level scenario intelligence. The client timeout is 50 seconds, below the Vercel function ceiling.

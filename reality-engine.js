@@ -4,7 +4,7 @@ import { buildDirectorContext, captureBranchPoint } from "./reality-intelligence
 const API_PATH = "/api/reality";
 
 export class RealityEngine {
-  constructor({ endpoint = API_PATH, timeout = 52000 } = {}) {
+  constructor({ endpoint = API_PATH, timeout = 50000 } = {}) {
     this.endpoint = endpoint;
     this.timeout = timeout;
     this.activeController = null;
