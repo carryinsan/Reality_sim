@@ -190,7 +190,7 @@ function buildLocalFallback(action, body) {
       evaluationCriteria: [{ name: "Clarity", description: "Explains the response clearly", weight: 34 }, { name: "Relevance", description: "Addresses the actual situation", weight: 33 }, { name: "Adaptability", description: "Responds to new information", weight: 33 }],
       openingLine: "Let's begin. How would you like to approach this situation?", openingCharacterId: "director-character", initialSceneMood: "calm",
       possibleComplications: ["The other person asks for clarification", "A new constraint emerges"], storyArc: [], worldFacts: ["This is a fictional practice simulation."], openThreads: [], worldVariables: [], sceneDesign: { lighting: "balanced", visualFocus: "the conversation", ambientMotion: "subtle" }
-    } }).scenario;
+    } });
   }
   if (action === "turn") {
     const scenario = body.scenario || {};

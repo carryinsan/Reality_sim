@@ -1,10 +1,12 @@
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import handler from "../api/reality.js";
 import { SCENARIOS, searchScenarios } from "../reality-scenarios.js";
 import { createSession, applyTurnResult, restoreSession } from "../reality-state.js";
 import { normaliseEvaluation } from "../reality-evaluator.js";
 import { buildDirectorContext, normaliseWorldUpdate, normaliseDecisionOptions, captureBranchPoint, createReplayBranch } from "../reality-intelligence.js";
+import { RealityEngine } from "../reality-engine.js";
 
 function mockResponse() {
   return {
@@ -224,4 +226,44 @@ test("temporary Gemini provider outage returns a usable local fallback turn", as
     globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.GEMINI_KEY; else process.env.GEMINI_KEY = previousKey;
   }
+});
+
+
+test("scenario creation fallback keeps the canonical response shape and remains playable", async () => {
+  const previousKey = process.env.GEMINI_KEY;
+  const previousFetch = globalThis.fetch;
+  process.env.GEMINI_KEY = "test-key-for-create-fallback";
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "temporary overload" } }), { status: 503, headers: { "Content-Type": "application/json" } });
+  try {
+    const apiResponse = mockResponse();
+    await handler({
+      method: "POST",
+      headers: { host: "localhost:3000", origin: "http://localhost:3000", "x-forwarded-for": "198.51.100.45" },
+      body: { action: "create", prompt: "Practise a realistic conversation with a project manager about a delayed deadline." }
+    }, apiResponse);
+    assert.equal(apiResponse.statusCode, 200);
+    assert.equal(apiResponse.body.degraded, true);
+    assert.ok(apiResponse.body.data.scenario.characters.length > 0);
+    assert.ok(apiResponse.body.data.scenario.openingLine);
+
+    // Verify both scenario entry points can consume the exact API response.
+    globalThis.fetch = async () => new Response(JSON.stringify(apiResponse.body), { status: 200, headers: { "Content-Type": "application/json" } });
+    const engine = new RealityEngine({ endpoint: "/api/reality" });
+    const prepared = await engine.prepareScenario({ title: "Deadline discussion", difficulty: "intermediate" });
+    assert.ok(prepared.characters.length > 0);
+    assert.ok(prepared.openingLine);
+    const custom = await engine.createCustomScenario("Practise a realistic conversation about a delayed deadline.");
+    assert.ok(custom.characters.length > 0);
+    assert.ok(custom.openingLine);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.GEMINI_KEY; else process.env.GEMINI_KEY = previousKey;
+  }
+});
+
+test("custom context document has a programmatically associated accessible label", () => {
+  const html = readFileSync(new URL("../reality.html", import.meta.url), "utf8");
+  assert.match(html, /<label class="document-drop" for="customContextFile">[\s\S]*?<input id="customContextFile"/);
+  assert.match(html, /<div class="field-label">Optional context document<\/div>/);
+  assert.doesNotMatch(html, /<label class="field-label">Optional context document<\/label>/);
 });

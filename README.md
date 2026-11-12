@@ -62,7 +62,7 @@ npm test
 vercel dev
 ```
 
-The test suite covers the 63-scenario catalogue, state recovery, multi-character turn handling, director context, world-state sanitisation, independent branch replay, partial-update preservation, evaluation normalisation, API readiness, Gemini key failover and enriched turn-response validation with a mocked provider.
+The test suite covers the 63-scenario catalogue, state recovery, multi-character turn handling, director context, world-state sanitisation, independent branch replay, partial-update preservation, evaluation normalisation, API readiness, Gemini key failover, enriched turn-response validation, scenario-generation fallback shape and the custom-context upload label with a mocked provider.
 
 ## API contract
 
@@ -94,3 +94,8 @@ No build can be truthfully guaranteed error-free across all browsers, model outa
 ### Timeout resilience update
 
 The server now caps the overall Gemini attempt window at 41 seconds by default, caps each key attempt at 12 seconds, uses low thinking effort for interactive turns, and reduces default output budgets. If Gemini times out, is temporarily unavailable, or all configured keys are rate-limited, the API returns a clearly marked built-in local fallback so an active session can continue. The fallback is intentionally limited: it can keep a turn moving, but it does not pretend to provide Gemini-level scenario intelligence. The client timeout is 50 seconds, below the Vercel function ceiling.
+
+
+### Scenario preparation and accessibility patch (2.1.1)
+
+The local create-scenario fallback now returns the same `{ scenario: ... }` data contract as a normal Gemini response. The engine also accepts the earlier bare-scenario shape defensively, so a stale API deployment cannot break scenario preparation. A regression test exercises both curated and custom scenario creation during a simulated Gemini 503 outage. The custom context file's visible heading is no longer an orphan `<label>`; the upload label remains explicitly associated with `customContextFile`.

@@ -27,8 +27,10 @@ export class RealityEngine {
       difficulty: options.difficulty || seed.difficulty || "intermediate",
       language: options.language || "English"
     });
-    const scenario = result.scenario;
-    if (!scenario?.characters?.length || !scenario?.openingLine) throw new Error("The scenario was not fully prepared. Please try again.");
+    const scenario = unwrapScenario(result);
+    if (!isPlayableScenario(scenario)) {
+      throw new Error("The scenario response was incomplete. Please retry; your selected situation has not been changed.");
+    }
     return scenario;
   }
 
@@ -37,7 +39,11 @@ export class RealityEngine {
       prompt: String(prompt).trim(), context,
       mode: options.mode || "training", difficulty: options.difficulty || "adaptive", language: options.language || "English"
     });
-    return result.scenario;
+    const scenario = unwrapScenario(result);
+    if (!isPlayableScenario(scenario)) {
+      throw new Error("The generated scenario response was incomplete. Please retry with a little more detail.");
+    }
+    return scenario;
   }
 
   startSession(scenario, options = {}) {
@@ -134,6 +140,24 @@ export class RealityEngine {
       if (this.activeController === controller) this.activeController = null;
     }
   }
+}
+
+function unwrapScenario(result) {
+  // Accept the canonical API shape and the legacy bare-scenario shape so a stale
+  // deployment cannot turn a valid fallback response into a blank setup screen.
+  if (result?.scenario && typeof result.scenario === "object") return result.scenario;
+  if (result && typeof result === "object" && Array.isArray(result.characters)) return result;
+  return null;
+}
+
+function isPlayableScenario(scenario) {
+  return Boolean(
+    scenario &&
+    Array.isArray(scenario.characters) &&
+    scenario.characters.length > 0 &&
+    String(scenario.openingLine || "").trim() &&
+    String(scenario.title || "").trim()
+  );
 }
 
 async function safeJSON(response) {
